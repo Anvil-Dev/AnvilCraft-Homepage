@@ -23,7 +23,7 @@ hero:
       link: posts/docs
     - theme: alt
       text: 最密堆积计算器
-      link: anvilcraft-stack-calculator/
+      link: https://anvil-dev.github.io/anvilcraft-stack-calculator/
 
 features:
   - title: 磁铁系统

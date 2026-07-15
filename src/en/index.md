@@ -23,7 +23,7 @@ hero:
       link: en/posts/docs
     - theme: alt
       text: Stack Calculator
-      link: anvilcraft-stack-calculator/
+      link: https://anvil-dev.github.io/anvilcraft-stack-calculator/
 
 features:
   - title: Magnet System
