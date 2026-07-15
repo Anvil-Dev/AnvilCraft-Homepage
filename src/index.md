@@ -21,6 +21,9 @@ hero:
     - theme: alt
       text: 开发文档
       link: posts/docs
+    - theme: alt
+      text: 最密堆积计算器
+      link: anvilcraft-stack-calculator/
 
 features:
   - title: 磁铁系统

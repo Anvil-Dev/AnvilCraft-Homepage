@@ -21,6 +21,9 @@ hero:
     - theme: alt
       text: Documentation
       link: en/posts/docs
+    - theme: alt
+      text: Stack Calculator
+      link: anvilcraft-stack-calculator/
 
 features:
   - title: Magnet System
