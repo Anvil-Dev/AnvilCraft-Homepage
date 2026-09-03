@@ -269,12 +269,23 @@ async function submit() {
     for (const f of imageFiles.value) {
       const fd = new FormData()
       fd.append('file', f)
+      let ok = false
       try {
         const r = await fetch(apiURL('/uploads'), {method: 'POST', headers: {Authorization: `Bearer ${token.value}`}, body: fd})
         const j = await r.json()
-        if (r.ok && j.url) uploaded.push(j.url)
+        if (r.ok && j.url) {
+          uploaded.push(j.url)
+          ok = true
+        } else {
+          errorMsg.value = `图片上传失败：${j.error ?? `HTTP ${r.status}`}`
+        }
       } catch {
-        // 上传端点不可用时跳过（开发期）
+        errorMsg.value = '图片上传失败：无法连接服务器，请重试'
+      }
+      if (!ok) {
+        // 任务书 5.1：附件必须随申请提交；上传失败则中止，避免图片静默丢失
+        submitting.value = false
+        return
       }
     }
     const payload = {...form.value, images: uploaded}
