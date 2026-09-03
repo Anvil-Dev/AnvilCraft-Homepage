@@ -25,6 +25,12 @@ interface Entry {
   description: string
   category_id: number
   check_states: Record<string, boolean> | null
+  user?: { bio?: string } | null
+}
+
+// 悬浮卡片展示的描述：条目描述优先，其次绑定用户的个人简介
+function descOf(e: Entry): string {
+  return e.description || e.user?.bio || ''
 }
 
 const apiBase = ref('')
@@ -113,7 +119,7 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
               v-for="e in entriesOf(cat.id)"
               :key="e.id"
               class="card"
-              :title="e.description || undefined"
+              :title="descOf(e) || undefined"
           >
             <img
                 v-if="e.avatar_url || avatarOf(e)"
@@ -142,7 +148,7 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
                 {{ ci.name }}
               </li>
             </ul>
-            <p v-if="e.description" class="desc">{{ e.description }}</p>
+            <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
           </div>
         </div>
       </section>
@@ -150,7 +156,7 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
       <section v-for="cat in separateCategories()" :key="'sep-' + cat.id" class="cat-block">
         <h2>{{ cat.separate_title || cat.name + ' ' + cat.emoji }}</h2>
         <div class="cards">
-          <div v-for="e in entriesOf(cat.id)" :key="e.id" class="card" :title="e.description || undefined">
+          <div v-for="e in entriesOf(cat.id)" :key="e.id" class="card" :title="descOf(e) || undefined">
             <img v-if="e.avatar_url || avatarOf(e)" class="avatar" :src="avatarOf(e)" :alt="e.nickname" loading="lazy"/>
             <span v-else class="avatar avatar-fallback" :style="{background: avatarColor(e.nickname)}">{{ avatarText(e.nickname) }}</span>
             <div class="info">
@@ -163,7 +169,7 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
                 {{ ci.name }}
               </li>
             </ul>
-            <p v-if="e.description" class="desc">{{ e.description }}</p>
+            <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
           </div>
         </div>
       </section>
