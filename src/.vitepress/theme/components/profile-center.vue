@@ -44,6 +44,14 @@ function apiURL(p: string) {
   return apiBase.value.replace(/\/$/, '') + '/api/v1' + p
 }
 
+// https 页面下把 http:// 图片 URL 升级为 https（防混合内容拦截）
+function upUrl(url: string): string {
+  if (typeof location !== 'undefined' && location.protocol === 'https:' && url.startsWith('http://')) {
+    return 'https://' + url.slice('http://'.length)
+  }
+  return url
+}
+
 async function beginLogin() {
   errorMsg.value = ''
   deviceExpired.value = false
@@ -340,7 +348,7 @@ onMounted(async () => {
 
       <section v-else class="panel">
         <div class="user-bar">
-          <img v-if="me.avatar_url" :src="me.avatar_url" class="avatar" alt="头像" />
+          <img v-if="me.avatar_url" :src="upUrl(me.avatar_url)" class="avatar" alt="头像" />
           <span>{{ me.nickname || me.username }}（{{ me.role }}）· GitHub: {{ me.username }}</span>
           <button class="btn" @click="logout">退出</button>
         </div>
@@ -350,7 +358,7 @@ onMounted(async () => {
         <div class="field">
           <span>头像</span>
           <div class="avatar-row">
-            <img v-if="form.avatar_url" :src="form.avatar_url" class="avatar-preview" alt="头像预览" />
+            <img v-if="form.avatar_url" :src="upUrl(form.avatar_url)" class="avatar-preview" alt="头像预览" />
             <label class="btn" :class="{disabled: uploadingAvatar}" for="avatar-file-input">
               {{ uploadingAvatar ? '上传中…' : '上传头像' }}
             </label>

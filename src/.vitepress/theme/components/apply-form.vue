@@ -63,6 +63,14 @@ function apiURL(p: string) {
   return apiBase.value.replace(/\/$/, '') + '/api/v1' + p
 }
 
+// https 页面下把 http:// 图片 URL 升级为 https（防混合内容拦截）
+function upUrl(url: string): string {
+  if (typeof location !== 'undefined' && location.protocol === 'https:' && url.startsWith('http://')) {
+    return 'https://' + url.slice('http://'.length)
+  }
+  return url
+}
+
 function setAuth(t: string, u: UserInfo) {
   token.value = t
   loggedUser.value = u
@@ -470,7 +478,7 @@ async function prefillFromEntry(userId: number) {
 
       <section v-else class="panel">
         <div class="user-bar">
-          <img v-if="loggedUser.avatar_url" :src="loggedUser.avatar_url" class="avatar" alt="头像" />
+          <img v-if="loggedUser.avatar_url" :src="upUrl(loggedUser.avatar_url)" class="avatar" alt="头像" />
           <span>{{ loggedUser.nickname || loggedUser.username }}（{{ loggedUser.role }}）</span>
           <button class="btn" @click="logout">退出</button>
         </div>
@@ -520,7 +528,7 @@ async function prefillFromEntry(userId: number) {
             <span>截图/图片（最多 {{ MAX_IMAGES }} 张，自动压缩为 JPG）</span>
             <div v-if="existingImages.length" class="imgs">
               <div v-for="(u, i) in existingImages" :key="'e' + i" class="img-item">
-                <img :src="u" alt="已有图片" />
+                <img :src="upUrl(u)" alt="已有图片" />
                 <button type="button" class="remove" @click="removeExistingImage(i)">×</button>
               </div>
             </div>
