@@ -35,6 +35,15 @@ const entries = ref<Entry[]>([])
 const checkItems = ref<CheckItem[]>([])
 const enabled = ref(false)
 
+// 无头像时使用后端 SVG 默认头像（糖果色 + 昵称文字）
+function avatarOf(e: Entry): string {
+  if (e.avatar_url) return e.avatar_url
+  if (apiBase.value) {
+    return apiBase.value + '/api/v1/avatar.svg?name=' + encodeURIComponent(e.nickname)
+  }
+  return ''
+}
+
 // 依据昵称生成默认头像文字与糖果底色（与后端规则一致）
 function avatarText(nickname: string): string {
   const chars = Array.from(nickname.trim())
@@ -85,10 +94,6 @@ async function load() {
 
 onMounted(load)
 
-function catById(id: number): Category | undefined {
-  return categories.value.find(c => c.id === id)
-}
-
 // 主列表分类（非单独列出）与独立榜单
 const mainCategories = (): Category[] => categories.value.filter(c => !c.separate)
 const separateCategories = (): Category[] => categories.value.filter(c => c.separate)
@@ -111,9 +116,9 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
               :title="e.description || undefined"
           >
             <img
-                v-if="e.avatar_url"
+                v-if="e.avatar_url || avatarOf(e)"
                 class="avatar"
-                :src="e.avatar_url"
+                :src="avatarOf(e)"
                 :alt="e.nickname"
                 loading="lazy"
             />
@@ -146,7 +151,7 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
         <h2>{{ cat.separate_title || cat.name + ' ' + cat.emoji }}</h2>
         <div class="cards">
           <div v-for="e in entriesOf(cat.id)" :key="e.id" class="card" :title="e.description || undefined">
-            <img v-if="e.avatar_url" class="avatar" :src="e.avatar_url" :alt="e.nickname" loading="lazy"/>
+            <img v-if="e.avatar_url || avatarOf(e)" class="avatar" :src="avatarOf(e)" :alt="e.nickname" loading="lazy"/>
             <span v-else class="avatar avatar-fallback" :style="{background: avatarColor(e.nickname)}">{{ avatarText(e.nickname) }}</span>
             <div class="info">
               <div class="name">{{ e.nickname }}</div>
