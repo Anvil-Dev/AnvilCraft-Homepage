@@ -1,0 +1,6 @@
+# pnpm 工作区与设置（pnpm ≥ 10 的设置统一放在此处，package.json 不再读取 pnpm 字段）
+#
+# 允许以下依赖执行安装脚本（pnpm 默认阻止依赖的 postinstall 构建）
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true
