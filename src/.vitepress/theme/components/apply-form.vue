@@ -225,6 +225,7 @@ onMounted(async () => {
       if (r.ok) {
         const j = await r.json()
         loggedUser.value = j.user
+        await prefillFromEntry(j.user.id)
       } else {
         logout()
       }
@@ -243,6 +244,30 @@ onMounted(async () => {
     errorMsg.value = '无法连接后端'
   }
 })
+
+// 5.2：若用户已绑定贡献者条目，再次申请时基于最新条目预填表单
+async function prefillFromEntry(userId: number) {
+  try {
+    const r = await fetch(apiURL(`/contributors?user_id=${userId}`), {
+      headers: {Authorization: `Bearer ${token.value}`},
+    })
+    if (!r.ok) return
+    const j = await r.json()
+    const list: any[] = j.entries ?? []
+    if (!list.length) return
+    // 取最近更新的条目（按 id desc 由后端排序保证近似）
+    const e = list[list.length - 1]
+    form.value.category_id = e.category_id ?? 0
+    form.value.nickname = e.nickname ?? ''
+    form.value.id = e.display_id ?? ''
+    form.value.qq = e.qq ?? ''
+    form.value.bilibili_uid = e.bilibili_uid ?? ''
+    form.value.mc_id = e.mc_id ?? ''
+    form.value.description = e.description ?? ''
+  } catch {
+    /* 预填失败不阻塞 */
+  }
+}
 </script>
 
 <template>
