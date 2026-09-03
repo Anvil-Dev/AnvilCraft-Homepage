@@ -31,6 +31,24 @@ const errorMsg = ref('')
 const device = ref<{device_code: string; user_code: string; verification_uri: string} | null>(null)
 const pollTimer = ref<number | null>(null)
 
+// 我的申请（5.2：待审核可修改/撤回）
+interface MyApp {
+  id: number
+  category_id: number
+  nickname: string
+  display_id: string
+  qq: string
+  bilibili_uid: string
+  mc_id: string
+  description: string
+  status: string
+  reject_reason?: string
+  created_at: string
+}
+const myApps = ref<MyApp[]>([])
+const editingAppId = ref<number | null>(null) // 正在编辑的申请 id（null=新申请）
+const noticeMsg = ref('')
+
 const TOKEN_KEY = 'anvil_website_token'
 const MAX_IMAGES = 10
 const MAX_SIZE = 5 * 1024 * 1024
@@ -43,12 +61,15 @@ function setAuth(t: string, u: UserInfo) {
   token.value = t
   loggedUser.value = u
   localStorage.setItem(TOKEN_KEY, t)
+  loadMyApps().catch(() => {})
 }
 
 function logout() {
   token.value = ''
   loggedUser.value = null
   localStorage.removeItem(TOKEN_KEY)
+  myApps.value = []
+  editingAppId.value = null
 }
 
 async function beginLogin() {
@@ -81,6 +102,8 @@ async function pollOnce(deviceCode: string) {
       setAuth(j.token, j.user)
       device.value = null
       if (pollTimer.value) window.clearInterval(pollTimer.value)
+      await loadMyApps()
+      await prefillFromEntry(j.user.id)
       return true
     }
   } catch {
@@ -157,6 +180,73 @@ function removeImage(i: number) {
   imagePreviews.value.splice(i, 1)
 }
 
+// 拉取我的申请列表
+async function loadMyApps() {
+  if (!token.value) return
+  try {
+    const r = await fetch(apiURL('/applications/mine'), {headers: {Authorization: `Bearer ${token.value}`}})
+    if (r.ok) {
+      const j = await r.json()
+      myApps.value = j.applications ?? []
+    }
+  } catch {
+    /* 忽略 */
+  }
+}
+
+// 编辑待审核申请（回填表单并切到编辑模式）
+function editApp(a: MyApp) {
+  editingAppId.value = a.id
+  form.value = {
+    category_id: a.category_id,
+    nickname: a.nickname,
+    id: a.display_id,
+    qq: a.qq,
+    bilibili_uid: a.bilibili_uid,
+    mc_id: a.mc_id,
+    description: a.description,
+  }
+  imageFiles.value = []
+  imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
+  imagePreviews.value = []
+  noticeMsg.value = ''
+  window.scrollTo({top: 0, behavior: 'smooth'})
+}
+
+// 撤回待审核申请
+async function withdrawApp(a: MyApp) {
+  if (!confirm(`确定撤回申请「${a.nickname}」吗？`)) return
+  try {
+    const r = await fetch(apiURL(`/applications/${a.id}/withdraw`), {
+      method: 'POST', headers: {Authorization: `Bearer ${token.value}`},
+    })
+    if (r.ok) {
+      noticeMsg.value = '已撤回申请'
+      await loadMyApps()
+    } else {
+      const j = await r.json()
+      errorMsg.value = j.error ?? '撤回失败'
+    }
+  } catch {
+    errorMsg.value = '撤回失败'
+  }
+}
+
+function statusLabel(s: string): string {
+  return {pending: '待审核', approved: '已通过', rejected: '已拒绝', withdrawn: '已撤回'}[s] ?? s
+}
+
+function catName(id: number): string {
+  const c = categories.value.find((x) => x.id === id)
+  return c ? `${c.name} ${c.emoji}` : `#${id}`
+}
+
+function cancelEdit() {
+  editingAppId.value = null
+  form.value = {category_id: 0, nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
+  errorMsg.value = ''
+}
+
 // ---------- 提交 ----------
 async function submit() {
   errorMsg.value = ''
@@ -174,7 +264,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    // 先逐张上传图片（上传端点规划为 POST /uploads；后端未实现时回退为直接提交图片名占位）
+    // 先逐张上传图片
     const uploaded: string[] = []
     for (const f of imageFiles.value) {
       const fd = new FormData()
@@ -187,23 +277,27 @@ async function submit() {
         // 上传端点不可用时跳过（开发期）
       }
     }
-    const r = await fetch(apiURL('/applications'), {
-      method: 'POST',
+    const payload = {...form.value, images: uploaded}
+    const isEdit = editingAppId.value !== null
+    const r = await fetch(isEdit ? apiURL(`/applications/${editingAppId.value}`) : apiURL('/applications'), {
+      method: isEdit ? 'PUT' : 'POST',
       headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token.value}`},
-      body: JSON.stringify({...form.value, images: uploaded}),
+      body: JSON.stringify(payload),
     })
     const j = await r.json()
     if (!r.ok) {
-      errorMsg.value = j.error ?? '提交失败'
+      errorMsg.value = j.error ?? (isEdit ? '修改失败' : '提交失败')
       return
     }
-    alert('申请已提交，等待管理员审核')
+    alert(isEdit ? '申请已更新，等待管理员审核' : '申请已提交，等待管理员审核')
+    editingAppId.value = null
     form.value = {category_id: 0, nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
     imageFiles.value = []
     imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
     imagePreviews.value = []
+    await loadMyApps()
   } catch (e: any) {
-    errorMsg.value = e?.message ?? '提交失败'
+    errorMsg.value = e?.message ?? (editingAppId.value ? '修改失败' : '提交失败')
   } finally {
     submitting.value = false
   }
@@ -225,6 +319,7 @@ onMounted(async () => {
       if (r.ok) {
         const j = await r.json()
         loggedUser.value = j.user
+        await loadMyApps()
         await prefillFromEntry(j.user.id)
       } else {
         logout()
@@ -245,8 +340,10 @@ onMounted(async () => {
   }
 })
 
-// 5.2：若用户已绑定贡献者条目，再次申请时基于最新条目预填表单
+// 5.2：若用户已绑定贡献者条目且无待审核申请，再次申请时基于最新条目预填表单
 async function prefillFromEntry(userId: number) {
+  // 有待审核申请时不预填（应通过「我的申请」编辑）
+  if (myApps.value.some((a) => a.status === 'pending')) return
   try {
     const r = await fetch(apiURL(`/contributors?user_id=${userId}`), {
       headers: {Authorization: `Bearer ${token.value}`},
@@ -294,7 +391,32 @@ async function prefillFromEntry(userId: number) {
           <button class="btn" @click="logout">退出</button>
         </div>
 
+        <!-- 我的申请（待审核可修改/撤回） -->
+        <div v-if="myApps.length" class="my-apps">
+          <h4>我的申请</h4>
+          <table class="app-table">
+            <thead><tr><th>项目</th><th>昵称</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr v-for="a in myApps" :key="a.id">
+                <td>{{ catName(a.category_id) }}</td>
+                <td>{{ a.nickname }}</td>
+                <td>
+                  <span class="status" :class="a.status">{{ statusLabel(a.status) }}</span>
+                  <div v-if="a.status === 'rejected' && a.reject_reason" class="reject">原因：{{ a.reject_reason }}</div>
+                </td>
+                <td class="time">{{ new Date(a.created_at).toLocaleDateString() }}</td>
+                <td>
+                  <button v-if="a.status === 'pending'" class="btn mini" @click="editApp(a)">修改</button>
+                  <button v-if="a.status === 'pending'" class="btn mini danger" @click="withdrawApp(a)">撤回</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <form class="apply-form" @submit.prevent="submit">
+          <h4 v-if="editingAppId !== null">修改申请（#{{ editingAppId }}）</h4>
+          <p v-else-if="noticeMsg" class="ok">{{ noticeMsg }}</p>
           <label class="field">
             贡献项目（必选）
             <select v-model.number="form.category_id">
@@ -321,9 +443,12 @@ async function prefillFromEntry(userId: number) {
           </div>
 
           <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
-          <button type="submit" class="btn primary" :disabled="submitting">
-            {{ submitting ? '提交中…' : '提交申请' }}
-          </button>
+          <div class="form-actions">
+            <button type="submit" class="btn primary" :disabled="submitting">
+              {{ submitting ? '提交中…' : editingAppId !== null ? '更新申请' : '提交申请' }}
+            </button>
+            <button v-if="editingAppId !== null" type="button" class="btn" @click="cancelEdit">取消编辑</button>
+          </div>
         </form>
       </section>
     </template>
@@ -422,5 +547,58 @@ async function prefillFromEntry(userId: number) {
 .error {
   color: #c62828;
   font-size: 13px;
+}
+.ok {
+  color: #2e7d32;
+  font-size: 13px;
+}
+.my-apps {
+  margin-bottom: 16px;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  padding-top: 10px;
+}
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.app-table th,
+.app-table td {
+  padding: 6px 6px;
+  text-align: left;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+}
+.status {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: #eee;
+}
+.status.pending { background: #fff3e0; color: #b26a00; }
+.status.approved { background: #e8f5e9; color: #2e7d32; }
+.status.rejected { background: #fdecea; color: #c62828; }
+.status.withdrawn { background: #eee; color: #777; }
+.reject {
+  font-size: 12px;
+  color: #c62828;
+}
+.time {
+  color: #888;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.btn.mini {
+  padding: 3px 10px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+.btn.mini.danger {
+  border-color: #e33;
+  color: #e33;
+}
+.form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 </style>
