@@ -54,6 +54,12 @@ const editingAppId = ref<number | null>(null) // 正在编辑的申请 id（null
 const noticeMsg = ref('')
 // 编辑模式保留的既有附件 URL（避免编辑时误清空原图）
 const existingImages = ref<string[]>([])
+// 「我的申请」行内展开查看附件的申请 id（null=收起）
+const detailImagesId = ref<number | null>(null)
+
+function toggleDetail(id: number) {
+  detailImagesId.value = detailImagesId.value === id ? null : id
+}
 
 const TOKEN_KEY = 'anvil_website_token'
 const MAX_IMAGES = 10
@@ -501,6 +507,18 @@ async function prefillFromEntry(userId: number) {
                 <td>
                   <button v-if="a.status === 'pending'" class="btn mini" @click="editApp(a)">修改</button>
                   <button v-if="a.status === 'pending'" class="btn mini danger" @click="withdrawApp(a)">撤回</button>
+                  <button v-if="a.images?.length" class="btn mini" @click="toggleDetail(a.id)">
+                    {{ detailImagesId === a.id ? '收起图片' : `图片(${a.images.length})` }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="detailImagesId === a.id" class="detail-row">
+                <td colspan="5">
+                  <div class="detail-imgs">
+                    <a v-for="(u, i) in (a.images ?? [])" :key="i" :href="upUrl(u)" target="_blank" rel="noopener">
+                      <img :src="upUrl(u)" alt="附件图" loading="lazy" />
+                    </a>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -705,5 +723,21 @@ async function prefillFromEntry(userId: number) {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.detail-row td {
+  background: rgba(128, 128, 128, 0.05);
+}
+.detail-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0;
+}
+.detail-imgs img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
 }
 </style>
