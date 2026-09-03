@@ -8,6 +8,17 @@ import path from 'node:path'
 // @ts-ignore
 import matter from 'gray-matter'
 
+/**
+ * 构建期注入后端 API 基址：读取环境变量 ANVIL_API_BASE。
+ * 页面组件通过 window.__ANVIL_API_BASE__ 访问；未配置时页面显示提示。
+ */
+function apiBaseScript() {
+    // @ts-ignore
+    const base = process.env.ANVIL_API_BASE || ''
+    if (!base) return null
+    return ['script', {type: 'text/javascript'}, `window.__ANVIL_API_BASE__=${JSON.stringify(base)};`] as const
+}
+
 function getFileTitle(filePath: string) {
     try {
         const content = fs.readFileSync(filePath, 'utf-8')
@@ -187,7 +198,10 @@ export default defineConfig({
     title: "AnvilCraft",
     description: "以铁砧为核心的原版生存拓展",
     lastUpdated: true,
-    head: [['link', {rel: 'icon', href: '/favicon.ico'}]],
+    head: [
+        ['link', {rel: 'icon', href: '/favicon.ico'}],
+        ...(apiBaseScript() ? [apiBaseScript()] : []),
+    ],
     themeConfig: {
         ...getAutoConfig(),
         search: {
