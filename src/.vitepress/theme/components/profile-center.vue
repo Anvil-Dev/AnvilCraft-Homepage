@@ -184,6 +184,52 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   })
 }
 
+// ---------- 邀请码注册为管理员 ----------
+const inviteCode = ref('')
+const regBusy = ref(false)
+const regMsg = ref('')
+const regErrMsg = ref('')
+
+async function registerAsAdmin() {
+  if (!token.value || !me.value) return
+  if (totpStep.value !== 'done') {
+    regErrMsg.value = '请先完成邮箱 TOTP 绑定'
+    return
+  }
+  if (!inviteCode.value.trim()) {
+    regErrMsg.value = '请输入邀请码'
+    return
+  }
+  regBusy.value = true
+  regMsg.value = ''
+  regErrMsg.value = ''
+  try {
+    const r = await fetch(apiURL('/auth/register-admin'), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token.value}`},
+      body: JSON.stringify({
+        invite_code: inviteCode.value.trim(),
+        email: totpEmail.value || me.value.email || '',
+        totp_code: totpCode.value.trim(),
+      }),
+    })
+    const j = await r.json()
+    if (!r.ok) {
+      regErrMsg.value = j.error ?? '注册失败'
+      return
+    }
+    token.value = j.token
+    me.value = j.user
+    localStorage.setItem(TOKEN_KEY, j.token)
+    regMsg.value = '注册成功，已成为管理员！'
+    inviteCode.value = ''
+  } catch {
+    regErrMsg.value = '注册失败：网络错误，请重试'
+  } finally {
+    regBusy.value = false
+  }
+}
+
 // ---------- TOTP ----------
 async function requestTOTP() {
   totpMsg.value = ''
@@ -306,6 +352,21 @@ onMounted(async () => {
           <button v-else class="btn primary" @click="requestTOTP">获取绑定密钥</button>
           <p v-if="totpMsg" class="ok">{{ totpMsg }}</p>
         </template>
+
+        <!-- 邀请码注册为管理员（2.2：仅普通用户、需先完成邮箱 TOTP 绑定） -->
+        <template v-if="me?.role === 'user'">
+          <h4>邀请码注册为管理员</h4>
+          <div class="secret-box">
+            <p class="hint">输入超级管理员分发的邀请码，将当前账号升级为管理员（权限由超管在后台分配）。</p>
+            <label class="field">邀请码<input v-model="inviteCode" placeholder="一次性邀请码" /></label>
+            <button class="btn primary" :disabled="regBusy || totpStep !== 'done'" @click="registerAsAdmin">
+              {{ regBusy ? '提交中…' : '提交注册' }}
+            </button>
+            <p v-if="totpStep !== 'done'" class="hint">请先完成上方邮箱 TOTP 绑定后再注册</p>
+            <p v-if="regMsg" class="ok">{{ regMsg }}</p>
+            <p v-if="regErrMsg" class="error">{{ regErrMsg }}</p>
+          </div>
+        </template>
       </section>
     </template>
   </div>
@@ -326,6 +387,10 @@ onMounted(async () => {
 }
 .ok {
   color: #2e7d32;
+  font-size: 13px;
+}
+.error {
+  color: #c62828;
   font-size: 13px;
 }
 .code {
