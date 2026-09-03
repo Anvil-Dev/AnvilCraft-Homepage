@@ -2,6 +2,7 @@
 // 动态贡献者列表：从后端 API 拉取贡献者条目、贡献项目、检查清单并渲染。
 // 后端地址优先取 window.__ANVIL_API_BASE__（由部署方注入）；未配置时优雅提示。
 import {onMounted, onUnmounted, ref} from 'vue'
+import {upUrl} from './img-url'
 
 interface CheckItem {
   id: number
@@ -44,19 +45,11 @@ const enabled = ref(false)
 
 // 无头像时使用后端 SVG 默认头像（糖果色 + 昵称文字）
 function avatarOf(e: Entry): string {
-  if (e.avatar_url) return upgradeHttp(e.avatar_url)
+  if (e.avatar_url) return upUrl(e.avatar_url)
   if (apiBase.value) {
     return apiBase.value + '/api/v1/avatar.svg?name=' + encodeURIComponent(e.nickname)
   }
   return ''
-}
-
-// https 页面下把 http:// 图片 URL 升级为 https（防混合内容拦截；跨域 http 资源不升）
-function upgradeHttp(url: string): string {
-  if (typeof location !== 'undefined' && location.protocol === 'https:' && url.startsWith('http://')) {
-    return 'https://' + url.slice('http://'.length)
-  }
-  return url
 }
 
 // 依据昵称生成默认头像文字与糖果底色（与后端规则一致）

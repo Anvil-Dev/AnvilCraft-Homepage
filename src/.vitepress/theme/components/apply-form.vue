@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 // 贡献者申请表单：登录（GitHub OAuth / Device Flow）后提交；多图上传并前端压缩为 JPG。
 import {onMounted, onUnmounted, ref} from 'vue'
+import {upUrl} from './img-url'
 
 interface Category {id: number; name: string; emoji: string}
 interface UserInfo {
@@ -67,14 +68,6 @@ const MAX_SIZE = 5 * 1024 * 1024
 
 function apiURL(p: string) {
   return apiBase.value.replace(/\/$/, '') + '/api/v1' + p
-}
-
-// https 页面下把 http:// 图片 URL 升级为 https（防混合内容拦截）
-function upUrl(url: string): string {
-  if (typeof location !== 'undefined' && location.protocol === 'https:' && url.startsWith('http://')) {
-    return 'https://' + url.slice('http://'.length)
-  }
-  return url
 }
 
 function setAuth(t: string, u: UserInfo) {

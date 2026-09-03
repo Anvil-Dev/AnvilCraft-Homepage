@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 // 个人中心：登录后查看/编辑个人描述与头像、邮箱 TOTP 绑定。
 import {onMounted, onUnmounted, ref} from 'vue'
+import {upUrl} from './img-url'
 
 interface UserInfo {
   id: number
@@ -42,14 +43,6 @@ const TOKEN_KEY = 'anvil_website_token'
 
 function apiURL(p: string) {
   return apiBase.value.replace(/\/$/, '') + '/api/v1' + p
-}
-
-// https 页面下把 http:// 图片 URL 升级为 https（防混合内容拦截）
-function upUrl(url: string): string {
-  if (typeof location !== 'undefined' && location.protocol === 'https:' && url.startsWith('http://')) {
-    return 'https://' + url.slice('http://'.length)
-  }
-  return url
 }
 
 async function beginLogin() {
