@@ -68,6 +68,23 @@ function setAuth(t: string, u: UserInfo) {
   loggedUser.value = u
   localStorage.setItem(TOKEN_KEY, t)
   loadMyApps().catch(() => {})
+  startMyAppsPolling()
+}
+
+// 登录后每 30s 静默刷新「我的申请」状态（审核通过/拒绝自动可见）
+let myAppsPollTimer: number | null = null
+function startMyAppsPolling() {
+  stopMyAppsPolling()
+  myAppsPollTimer = window.setInterval(() => {
+    if (!token.value) return
+    loadMyApps().catch(() => {})
+  }, 30 * 1000)
+}
+function stopMyAppsPolling() {
+  if (myAppsPollTimer) {
+    window.clearInterval(myAppsPollTimer)
+    myAppsPollTimer = null
+  }
 }
 
 function logout() {
@@ -76,6 +93,7 @@ function logout() {
   localStorage.removeItem(TOKEN_KEY)
   myApps.value = []
   editingAppId.value = null
+  stopMyAppsPolling()
 }
 
 async function beginLogin() {
@@ -151,6 +169,7 @@ function cancelDevicePolling() {
 
 onUnmounted(() => {
   stopDevicePolling()
+  stopMyAppsPolling()
 })
 
 // ---------- 图片压缩为 JPG ----------
@@ -381,6 +400,7 @@ onMounted(async () => {
         loggedUser.value = j.user
         await loadMyApps()
         await prefillFromEntry(j.user.id)
+        startMyAppsPolling()
       } else {
         logout()
       }
