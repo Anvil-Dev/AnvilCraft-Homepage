@@ -100,8 +100,9 @@ async function beginLogin() {
   errorMsg.value = ''
   deviceExpired.value = false
   try {
-    // 尝试 Device Flow 起始（后端未配置 Secret 时返回设备码）
+    // Device Flow 恒可用（GitHub 设备流仅需 client_id，后端已强制该端点走设备流）
     const r = await fetch(apiURL('/auth/device/start'))
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const j = await r.json()
     if (j.device_flow) {
       device.value = j
@@ -109,11 +110,12 @@ async function beginLogin() {
       startPolling(j.device_code)
       return
     }
-  } catch {
-    /* 忽略 */
+  } catch (e: any) {
+    // 官网不使用授权码模式（回调域名指向控制台），失败直接提示
+    errorMsg.value = '无法发起登录：' + (e?.message ?? '请稍后重试')
+    return
   }
-  // 标准 OAuth 授权跳转
-  window.location.href = apiURL('/auth/begin')
+  errorMsg.value = '无法发起登录：后端未返回设备码'
 }
 
 async function pollOnce(deviceCode: string) {
