@@ -485,6 +485,7 @@ async function prefillFromEntry(userId: number) {
                 <td>
                   <span class="status" :class="a.status">{{ statusLabel(a.status) }}</span>
                   <div v-if="a.status === 'rejected' && a.reject_reason" class="reject">原因：{{ a.reject_reason }}</div>
+                  <a v-if="a.status === 'approved'" class="approved-link" href="./contributors.html" target="_blank" rel="noopener">已收录到贡献者墙 →</a>
                 </td>
                 <td class="time">{{ new Date(a.created_at).toLocaleDateString() }}</td>
                 <td>
@@ -666,6 +667,12 @@ async function prefillFromEntry(userId: number) {
 .status.approved { background: #e8f5e9; color: #2e7d32; }
 .status.rejected { background: #fdecea; color: #c62828; }
 .status.withdrawn { background: #eee; color: #777; }
+.approved-link {
+  display: block;
+  font-size: 12px;
+  color: #2e7d32;
+  margin-top: 2px;
+}
 .reject {
   font-size: 12px;
   color: #c62828;
