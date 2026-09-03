@@ -36,6 +36,7 @@ function descOf(e: Entry): string {
 const apiBase = ref('')
 const loading = ref(true)
 const error = ref('')
+const noConfig = ref(false)
 const categories = ref<Category[]>([])
 const entries = ref<Entry[]>([])
 const checkItems = ref<CheckItem[]>([])
@@ -73,9 +74,11 @@ async function load() {
   if (!base) {
     loading.value = false
     enabled.value = false
+    noConfig.value = true
     error.value = '尚未配置后端 API 地址（window.__ANVIL_API_BASE__）'
     return
   }
+  noConfig.value = false
   apiBase.value = base.replace(/\/$/, '')
   try {
     const [catRes, entryRes, checkRes] = await Promise.all([
@@ -91,11 +94,18 @@ async function load() {
     entries.value = entryJson.entries ?? []
     checkItems.value = (checkJson.items ?? []).filter((i: CheckItem) => i.enabled)
     enabled.value = true
+    error.value = ''
   } catch (e: any) {
     error.value = `加载失败：${e?.message ?? e}`
   } finally {
     loading.value = false
   }
+}
+
+// 加载失败后重试
+function retry() {
+  enabled.value = false
+  load()
 }
 
 onMounted(load)
@@ -109,7 +119,10 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
 <template>
   <div class="dynamic-contributors">
     <p v-if="loading" class="hint">加载中…</p>
-    <p v-else-if="error" class="hint">{{ error }}</p>
+    <div v-else-if="error" class="hint">
+      <p>{{ error }}</p>
+      <button v-if="!noConfig" class="retry-btn" @click="retry">重试</button>
+    </div>
 
     <template v-else-if="enabled">
       <section v-for="cat in mainCategories()" :key="cat.id" class="cat-block">
@@ -181,6 +194,19 @@ const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.catego
 .hint {
   color: #888;
   padding: 12px 0;
+}
+.retry-btn {
+  margin-top: 8px;
+  padding: 5px 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+.retry-btn:hover {
+  border-color: #1f6feb;
+  color: #1f6feb;
 }
 .cat-block {
   margin: 20px 0;
