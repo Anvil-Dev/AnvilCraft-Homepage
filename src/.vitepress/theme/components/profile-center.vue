@@ -135,6 +135,55 @@ function logout() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+// 头像上传：压缩到 256px 方形 JPG 后上传，成功后回填 avatar_url
+const uploadingAvatar = ref(false)
+const avatarMsg = ref('')
+
+async function uploadAvatar(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !token.value) return
+  uploadingAvatar.value = true
+  avatarMsg.value = ''
+  try {
+    // 压缩为方形小图
+    const img = await loadImage(file)
+    const size = 256
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, size, size)
+    const side = Math.min(img.width, img.height)
+    ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+    if (!blob) throw new Error('图片压缩失败')
+    const fd = new FormData()
+    fd.append('file', new File([blob], 'avatar.jpg', {type: 'image/jpeg'}))
+    const r = await fetch(apiURL('/uploads'), {method: 'POST', headers: {Authorization: `Bearer ${token.value}`}, body: fd})
+    const j = await r.json()
+    if (!r.ok || !j.url) throw new Error(j.error ?? '上传失败')
+    form.value.avatar_url = j.url
+    avatarMsg.value = '头像已上传，点击「保存资料」生效'
+  } catch (err: any) {
+    avatarMsg.value = '上传失败：' + (err?.message ?? err)
+  } finally {
+    uploadingAvatar.value = false
+    input.value = ''
+  }
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')) }
+    img.src = url
+  })
+}
+
 // ---------- TOTP ----------
 async function requestTOTP() {
   totpMsg.value = ''
@@ -222,7 +271,20 @@ onMounted(async () => {
 
         <h4>个人资料</h4>
         <label class="field">昵称<input v-model="form.nickname" /></label>
-        <label class="field">头像 URL<input v-model="form.avatar_url" placeholder="留空使用 GitHub 头像" /></label>
+        <div class="field">
+          <span>头像</span>
+          <div class="avatar-row">
+            <img v-if="form.avatar_url" :src="form.avatar_url" class="avatar-preview" alt="头像预览" />
+            <label class="btn" :class="{disabled: uploadingAvatar}" for="avatar-file-input">
+              {{ uploadingAvatar ? '上传中…' : '上传头像' }}
+            </label>
+            <input id="avatar-file-input" type="file" accept="image/*" class="hide-input" @change="uploadAvatar" />
+          </div>
+          <div class="avatar-sub">
+            <input v-model="form.avatar_url" placeholder="或直接填写头像 URL（留空使用 GitHub 头像）" />
+          </div>
+          <span v-if="avatarMsg" class="ok small-tip">{{ avatarMsg }}</span>
+        </div>
         <label class="field">个人描述<textarea v-model="form.bio" rows="4" placeholder="写一段关于你的介绍（悬浮贡献者卡片时展示）" /></label>
         <button class="btn primary" :disabled="saving" @click="saveProfile">{{ saving ? '保存中…' : '保存资料' }}</button>
         <p v-if="msg" class="ok">{{ msg }}</p>
@@ -320,5 +382,41 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 10px;
   margin: 6px 0;
+}
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.avatar-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #ddd;
+}
+.hide-input {
+  display: none;
+}
+.btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.avatar-sub {
+  margin-top: 6px;
+}
+.avatar-sub input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+.small-tip {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
 }
 </style>
