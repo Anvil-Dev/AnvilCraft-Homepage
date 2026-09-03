@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 // 贡献者申请表单：登录（GitHub OAuth / Device Flow）后提交；多图上传并前端压缩为 JPG。
-import {onMounted, ref} from 'vue'
+import {onMounted, onUnmounted, ref} from 'vue'
 
 interface Category {id: number; name: string; emoji: string}
 interface UserInfo {
@@ -29,7 +29,10 @@ const imagePreviews = ref<string[]>([])
 const submitting = ref(false)
 const errorMsg = ref('')
 const device = ref<{device_code: string; user_code: string; verification_uri: string} | null>(null)
+const deviceExpired = ref(false)
 const pollTimer = ref<number | null>(null)
+let pollDeadline = 0
+const POLL_TIMEOUT_MS = 15 * 60 * 1000
 
 // 我的申请（5.2：待审核可修改/撤回）
 interface MyApp {
@@ -74,12 +77,14 @@ function logout() {
 
 async function beginLogin() {
   errorMsg.value = ''
+  deviceExpired.value = false
   try {
     // 尝试 Device Flow 起始（后端未配置 Secret 时返回设备码）
     const r = await fetch(apiURL('/auth/device/start'))
     const j = await r.json()
     if (j.device_flow) {
       device.value = j
+      pollDeadline = Date.now() + POLL_TIMEOUT_MS
       startPolling(j.device_code)
       return
     }
@@ -91,6 +96,10 @@ async function beginLogin() {
 }
 
 async function pollOnce(deviceCode: string) {
+  if (Date.now() > pollDeadline) {
+    deviceExpired.value = true
+    return false
+  }
   try {
     const r = await fetch(apiURL('/auth/device/poll'), {
       method: 'POST',
@@ -101,7 +110,7 @@ async function pollOnce(deviceCode: string) {
     if (j.token) {
       setAuth(j.token, j.user)
       device.value = null
-      if (pollTimer.value) window.clearInterval(pollTimer.value)
+      stopDevicePolling()
       await loadMyApps()
       await prefillFromEntry(j.user.id)
       return true
@@ -113,13 +122,33 @@ async function pollOnce(deviceCode: string) {
 }
 
 async function startPolling(deviceCode: string) {
-  if (pollTimer.value) window.clearInterval(pollTimer.value)
+  stopDevicePolling()
   const tick = async () => {
     const done = await pollOnce(deviceCode)
-    if (!done) pollTimer.value = window.setTimeout(tick, 5000)
+    if (!done && !deviceExpired.value) pollTimer.value = window.setTimeout(tick, 5000)
   }
   tick()
 }
+
+// 停止轮询并复位设备码状态
+function stopDevicePolling() {
+  if (pollTimer.value) {
+    window.clearTimeout(pollTimer.value)
+    pollTimer.value = null
+  }
+}
+
+// 用户主动取消等待
+function cancelDevicePolling() {
+  stopDevicePolling()
+  device.value = null
+  deviceExpired.value = false
+  pollDeadline = 0
+}
+
+onUnmounted(() => {
+  stopDevicePolling()
+})
 
 // ---------- 图片压缩为 JPG ----------
 async function fileToJpeg(file: File): Promise<File> {
@@ -392,6 +421,8 @@ async function prefillFromEntry(userId: number) {
           <p>请在 GitHub 设备授权页输入设备码：</p>
           <div class="code">{{ device.user_code }}</div>
           <p class="hint">授权地址：{{ device.verification_uri }}（等待自动确认…）</p>
+          <p v-if="deviceExpired" class="error">设备码已过期，请点击上方 GitHub 登录重新获取。</p>
+          <button class="btn mini" @click="cancelDevicePolling">取消等待</button>
         </div>
       </section>
 

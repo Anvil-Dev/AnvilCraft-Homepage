@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 // 个人中心：登录后查看/编辑个人描述与头像、邮箱 TOTP 绑定。
-import {onMounted, ref} from 'vue'
+import {onMounted, onUnmounted, ref} from 'vue'
 
 interface UserInfo {
   id: number
@@ -33,7 +33,10 @@ const totpCode = ref('')
 const totpMsg = ref('')
 
 const device = ref<{device_code: string; user_code: string; verification_uri: string} | null>(null)
+const deviceExpired = ref(false)
 let pollTimer: number | null = null
+let pollDeadline = 0
+const POLL_TIMEOUT_MS = 15 * 60 * 1000
 
 const TOKEN_KEY = 'anvil_website_token'
 
@@ -43,14 +46,16 @@ function apiURL(p: string) {
 
 async function beginLogin() {
   errorMsg.value = ''
+  deviceExpired.value = false
   try {
     const r = await fetch(apiURL('/auth/device/start'))
     const j = await r.json()
     if (j.device_flow) {
       device.value = j
+      pollDeadline = Date.now() + POLL_TIMEOUT_MS
       const tick = async () => {
         const ok = await pollOnce(j.device_code)
-        if (!ok) pollTimer = window.setTimeout(tick, 5000)
+        if (!ok && !deviceExpired.value) pollTimer = window.setTimeout(tick, 5000)
       }
       tick()
       return
@@ -61,7 +66,25 @@ async function beginLogin() {
   window.location.href = apiURL('/auth/begin')
 }
 
+function cancelDevicePolling() {
+  if (pollTimer) {
+    window.clearTimeout(pollTimer)
+    pollTimer = null
+  }
+  device.value = null
+  deviceExpired.value = false
+  pollDeadline = 0
+}
+
+onUnmounted(() => {
+  if (pollTimer) window.clearTimeout(pollTimer)
+})
+
 async function pollOnce(deviceCode: string): Promise<boolean> {
+  if (Date.now() > pollDeadline) {
+    deviceExpired.value = true
+    return false
+  }
   try {
     const r = await fetch(apiURL('/auth/device/poll'), {
       method: 'POST',
@@ -305,6 +328,8 @@ onMounted(async () => {
           <p>请在 GitHub 设备授权页输入设备码：</p>
           <div class="code">{{ device.user_code }}</div>
           <p class="hint">授权地址：{{ device.verification_uri }}（等待自动确认…）</p>
+          <p v-if="deviceExpired" class="error">设备码已过期，请重新点击 GitHub 登录。</p>
+          <button class="btn" @click="cancelDevicePolling">取消等待</button>
         </div>
       </section>
 
