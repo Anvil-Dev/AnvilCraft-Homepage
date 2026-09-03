@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 // 动态贡献者列表：从后端 API 拉取贡献者条目、贡献项目、检查清单并渲染。
 // 后端地址优先取 window.__ANVIL_API_BASE__（由部署方注入）；未配置时优雅提示。
-import {onMounted, ref} from 'vue'
+import {onMounted, onUnmounted, ref} from 'vue'
 
 interface CheckItem {
   id: number
@@ -108,7 +108,48 @@ function retry() {
   load()
 }
 
-onMounted(load)
+// 静默刷新（不闪 loading、不重置错误态）；供轮询与页面重新可见时调用
+async function refreshSilently() {
+  if (noConfig.value || !apiBase.value) return
+  try {
+    const [catRes, entryRes, checkRes] = await Promise.all([
+      fetch(`${apiBase.value}/api/v1/categories`),
+      fetch(`${apiBase.value}/api/v1/contributors`),
+      fetch(`${apiBase.value}/api/v1/checklist`),
+    ])
+    if (!catRes.ok || !entryRes.ok || !checkRes.ok) return
+    const catJson = await catRes.json()
+    const entryJson = await entryRes.json()
+    const checkJson = await checkRes.json()
+    if (catJson.categories) categories.value = catJson.categories
+    if (entryJson.entries) entries.value = entryJson.entries
+    if (checkJson.items) checkItems.value = (checkJson.items ?? []).filter((i: CheckItem) => i.enabled)
+  } catch {
+    /* 静默失败：保留当前数据 */
+  }
+}
+
+let pollTimer: number | null = null
+
+onMounted(() => {
+  load()
+  // 每 60s 静默刷新，保持与后端数据同步（新审核通过的条目可见）
+  pollTimer = window.setInterval(refreshSilently, 60 * 1000)
+  // 页面重新可见时立即刷新（如从后台标签切回）
+  document.addEventListener('visibilitychange', onVisibility)
+})
+
+function onVisibility() {
+  if (!document.hidden) refreshSilently()
+}
+
+onUnmounted(() => {
+  if (pollTimer) {
+    window.clearInterval(pollTimer)
+    pollTimer = null
+  }
+  document.removeEventListener('visibilitychange', onVisibility)
+})
 
 // 主列表分类（非单独列出）与独立榜单
 const mainCategories = (): Category[] => categories.value.filter(c => !c.separate)
