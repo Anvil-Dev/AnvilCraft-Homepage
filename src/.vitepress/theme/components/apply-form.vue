@@ -44,6 +44,7 @@ interface MyApp {
   bilibili_uid: string
   mc_id: string
   description: string
+  images?: string[]
   status: string
   reject_reason?: string
   created_at: string
@@ -51,6 +52,8 @@ interface MyApp {
 const myApps = ref<MyApp[]>([])
 const editingAppId = ref<number | null>(null) // 正在编辑的申请 id（null=新申请）
 const noticeMsg = ref('')
+// 编辑模式保留的既有附件 URL（避免编辑时误清空原图）
+const existingImages = ref<string[]>([])
 
 const TOKEN_KEY = 'anvil_website_token'
 const MAX_IMAGES = 10
@@ -223,7 +226,7 @@ async function loadMyApps() {
   }
 }
 
-// 编辑待审核申请（回填表单并切到编辑模式）
+// 编辑待审核申请（回填表单并切到编辑模式；保留既有附件图）
 function editApp(a: MyApp) {
   editingAppId.value = a.id
   form.value = {
@@ -238,8 +241,14 @@ function editApp(a: MyApp) {
   imageFiles.value = []
   imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
   imagePreviews.value = []
+  existingImages.value = [...(a.images ?? [])]
   noticeMsg.value = ''
   window.scrollTo({top: 0, behavior: 'smooth'})
+}
+
+// 移除既有附件图（编辑模式）
+function removeExistingImage(i: number) {
+  existingImages.value.splice(i, 1)
 }
 
 // 撤回待审核申请
@@ -273,6 +282,10 @@ function catName(id: number): string {
 function cancelEdit() {
   editingAppId.value = null
   form.value = {category_id: 0, nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
+  imageFiles.value = []
+  imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
+  imagePreviews.value = []
+  existingImages.value = []
   errorMsg.value = ''
 }
 
@@ -317,7 +330,13 @@ async function submit() {
         return
       }
     }
-    const payload = {...form.value, images: uploaded}
+    // 附件 = 保留的既有图 + 新上传图（总数不超 10）
+    if (existingImages.value.length + uploaded.length > MAX_IMAGES) {
+      errorMsg.value = `附件图片最多 ${MAX_IMAGES} 张（含已有图片）`
+      submitting.value = false
+      return
+    }
+    const payload = {...form.value, images: [...existingImages.value, ...uploaded]}
     const isEdit = editingAppId.value !== null
     const r = await fetch(isEdit ? apiURL(`/applications/${editingAppId.value}`) : apiURL('/applications'), {
       method: isEdit ? 'PUT' : 'POST',
@@ -335,6 +354,7 @@ async function submit() {
     imageFiles.value = []
     imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
     imagePreviews.value = []
+    existingImages.value = []
     await loadMyApps()
   } catch (e: any) {
     errorMsg.value = e?.message ?? (editingAppId.value ? '修改失败' : '提交失败')
@@ -475,6 +495,12 @@ async function prefillFromEntry(userId: number) {
 
           <div class="field">
             <span>截图/图片（最多 {{ MAX_IMAGES }} 张，自动压缩为 JPG）</span>
+            <div v-if="existingImages.length" class="imgs">
+              <div v-for="(u, i) in existingImages" :key="'e' + i" class="img-item">
+                <img :src="u" alt="已有图片" />
+                <button type="button" class="remove" @click="removeExistingImage(i)">×</button>
+              </div>
+            </div>
             <input type="file" accept="image/*" multiple @change="(e: Event) => onPickFiles((e.target as HTMLInputElement).files)" />
             <div class="imgs">
               <div v-for="(p, i) in imagePreviews" :key="i" class="img-item">
