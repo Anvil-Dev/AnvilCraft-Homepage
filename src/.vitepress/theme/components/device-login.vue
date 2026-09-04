@@ -183,12 +183,12 @@ onUnmounted(stopPolling)
   display: inline-block;
   padding: 10px 22px;
   border-radius: 8px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--vp-c-divider);
   cursor: pointer;
   text-decoration: none;
   font-size: 15px;
-  background: #fff;
-  color: #1f2328;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
   transition: all 0.2s;
 }
 .btn.primary {

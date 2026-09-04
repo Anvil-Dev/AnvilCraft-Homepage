@@ -509,9 +509,10 @@ onMounted(async () => {
 .btn {
   padding: 8px 18px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--vp-c-divider);
   cursor: pointer;
-  background: #fff;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
 }
 .btn.primary {
   background: #1f6feb;

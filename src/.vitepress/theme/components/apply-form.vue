@@ -618,9 +618,10 @@ async function prefillFromEntry(userId: number) {
 .btn {
   padding: 8px 18px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--vp-c-divider);
   cursor: pointer;
-  background: #fff;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
 }
 .btn.primary {
   background: #1f6feb;
@@ -655,11 +656,11 @@ async function prefillFromEntry(userId: number) {
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--vp-c-divider);
   border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
-  background: #fff;
+  background: var(--vp-c-bg-soft);
   transition: all 0.15s;
 }
 .cat-check:hover {
