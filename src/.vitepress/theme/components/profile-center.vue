@@ -2,6 +2,7 @@
 // 个人中心：登录后查看/编辑个人描述与头像、邮箱 TOTP 绑定。
 import {onMounted, onUnmounted, ref} from 'vue'
 import {upUrl} from './img-url'
+import {authStore} from '../auth-store'
 
 interface UserInfo {
   id: number
@@ -126,6 +127,7 @@ async function refreshMe() {
       const j = await r.json()
       me.value = j.user
       fillForm(j.user)
+      loadMyApps().catch(() => {})
     }
   } catch {
     /* 忽略 */
@@ -160,7 +162,59 @@ async function saveProfile() {
 function logout() {
   token.value = ''
   me.value = null
-  localStorage.removeItem(TOKEN_KEY)
+  authStore.clearAuth()
+}
+
+// ---------- 我的贡献者申请（查看/撤回；修改去申请页）----------
+interface MyApp {
+  id: number
+  category_id: number
+  nickname: string
+  display_id: string
+  status: string
+  reject_reason?: string
+  created_at: string
+}
+const myApps = ref<MyApp[]>([])
+const myAppsLoaded = ref(false)
+
+const catOf = (id: number): string => {
+  // 分类名由申请接口不返回，这里不做映射（仅显示编号）——申请页展示详情
+  return `#${id}`
+}
+
+function statusLabel(s: string): string {
+  return {pending: '待审核', approved: '已通过', rejected: '已拒绝', withdrawn: '已撤回'}[s] ?? s
+}
+
+async function loadMyApps() {
+  if (!token.value) return
+  try {
+    const r = await fetch(apiURL('/applications/mine'), {
+      headers: {Authorization: `Bearer ${token.value}`},
+    })
+    if (r.ok) {
+      const j = await r.json()
+      myApps.value = j.applications ?? []
+      myAppsLoaded.value = true
+    }
+  } catch { /* 忽略 */ }
+}
+
+async function withdrawApp(a: MyApp) {
+  if (!window.confirm(`确定撤回申请「${a.nickname}」吗？`)) return
+  try {
+    const r = await fetch(apiURL(`/applications/${a.id}/withdraw`), {
+      method: 'POST', headers: {Authorization: `Bearer ${token.value}`},
+    })
+    if (r.ok) await loadMyApps()
+    else {
+      const j = await r.json()
+      msg.value = j.error ?? '撤回失败'
+    }
+  } catch {
+    msg.value = '撤回失败'
+  }
 }
 
 // 头像上传：压缩到 256px 方形 JPG 后上传，成功后回填 avatar_url
@@ -306,17 +360,22 @@ async function verifyTOTP() {
 }
 
 onMounted(async () => {
+  // API 基址：__ANVIL_API_BASE__ 优先，缺省同源（生产反代 /api）
   const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  if (!base) {
-    errorMsg.value = '尚未配置后端 API（window.__ANVIL_API_BASE__）'
-    return
-  }
-  apiBase.value = base.replace(/\/$/, '')
+  apiBase.value = (base || '').replace(/\/$/, '')
   enabled.value = true
-  const saved = localStorage.getItem(TOKEN_KEY)
-  if (saved) {
-    token.value = saved
+  errorMsg.value = ''
+  // 会话恢复：优先全局 authStore（与导航/登录页同源）
+  await authStore.restore()
+  if (authStore.token) {
+    token.value = authStore.token
     await refreshMe()
+  } else {
+    const saved = localStorage.getItem(TOKEN_KEY)
+    if (saved) {
+      token.value = saved
+      await refreshMe()
+    }
   }
 })
 </script>
@@ -327,16 +386,9 @@ onMounted(async () => {
     <template v-if="enabled">
       <section v-if="!me" class="panel">
         <h3>个人中心</h3>
-        <p class="hint">登录后即可编辑个人描述与头像。</p>
-        <button class="btn primary" @click="beginLogin">使用 GitHub 登录</button>
+        <p class="hint">登录后即可编辑个人描述与头像、管理你的贡献者申请。</p>
+        <a class="btn primary" href="/login?redirect=/posts/base-info/profile">使用 GitHub 登录</a>
         <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
-        <div v-if="device" class="device">
-          <p>请在 GitHub 设备授权页输入设备码：</p>
-          <div class="code">{{ device.user_code }}</div>
-          <p class="hint">授权地址：{{ device.verification_uri }}（等待自动确认…）</p>
-          <p v-if="deviceExpired" class="error">设备码已过期，请重新点击 GitHub 登录。</p>
-          <button class="btn" @click="cancelDevicePolling">取消等待</button>
-        </div>
       </section>
 
       <section v-else class="panel">
@@ -398,6 +450,27 @@ onMounted(async () => {
             <p v-if="regErrMsg" class="error">{{ regErrMsg }}</p>
           </div>
         </template>
+        <!-- 我的贡献者申请 -->
+        <h4>我的贡献者申请</h4>
+        <div v-if="!myAppsLoaded" class="hint">加载中…</div>
+        <div v-else-if="!myApps.length" class="hint">
+          暂无申请。
+          <a href="/posts/base-info/apply">去提交申请 →</a>
+        </div>
+        <ul v-else class="my-apps">
+          <li v-for="a in myApps" :key="a.id" class="app-item">
+            <div class="app-info">
+              <span class="app-name">{{ a.nickname }}</span>
+              <span class="badge" :class="a.status">{{ statusLabel(a.status) }}</span>
+              <span class="app-id">申请 #{{ a.id }}（分类 {{ catOf(a.category_id) }}）</span>
+              <span v-if="a.reject_reason" class="app-reason">拒绝原因：{{ a.reject_reason }}</span>
+            </div>
+            <span v-if="a.status === 'pending'" class="app-actions">
+              <a class="link-btn" href="/posts/base-info/apply">修改</a>
+              <button class="link-btn danger" @click="withdrawApp(a)">撤回</button>
+            </span>
+          </li>
+        </ul>
       </section>
     </template>
   </div>
@@ -423,8 +496,7 @@ onMounted(async () => {
 .error {
   color: #c62828;
   font-size: 13px;
-}
-.code {
+}.code {
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 4px;
@@ -514,5 +586,75 @@ onMounted(async () => {
   display: block;
   font-size: 12px;
   margin-top: 4px;
+}
+.my-apps {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.app-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(128, 128, 128, 0.25);
+  font-size: 14px;
+}
+.app-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.app-name {
+  font-weight: 600;
+}
+.badge {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #eee;
+}
+.badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+.badge.approved {
+  background: #d4edda;
+  color: #155724;
+}
+.badge.rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+.badge.withdrawn {
+  background: #e2e3e5;
+  color: #383d41;
+}
+.app-id,
+.app-reason {
+  color: #888;
+  font-size: 12px;
+}
+.app-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: #1f6feb;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: none;
+}
+.link-btn.danger {
+  color: #c62828;
+}
+.link-btn:hover {
+  text-decoration: underline;
 }
 </style>

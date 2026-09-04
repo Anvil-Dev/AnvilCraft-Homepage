@@ -2,6 +2,7 @@
 // 贡献者申请表单：登录（GitHub OAuth / Device Flow）后提交；多图上传并前端压缩为 JPG。
 import {onMounted, onUnmounted, ref} from 'vue'
 import {upUrl} from './img-url'
+import {authStore} from '../auth-store'
 
 interface Category {id: number; name: string; emoji: string}
 interface UserInfo {
@@ -73,7 +74,7 @@ function apiURL(p: string) {
 function setAuth(t: string, u: UserInfo) {
   token.value = t
   loggedUser.value = u
-  localStorage.setItem(TOKEN_KEY, t)
+  authStore.setAuth(t, u)
   loadMyApps().catch(() => {})
   startMyAppsPolling()
 }
@@ -97,7 +98,7 @@ function stopMyAppsPolling() {
 function logout() {
   token.value = ''
   loggedUser.value = null
-  localStorage.removeItem(TOKEN_KEY)
+  authStore.clearAuth()
   myApps.value = []
   editingAppId.value = null
   stopMyAppsPolling()
@@ -393,12 +394,10 @@ async function submit() {
 
 onMounted(async () => {
   const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  if (!base) {
-    errorMsg.value = '尚未配置后端 API（window.__ANVIL_API_BASE__）'
-    return
-  }
-  apiBase.value = base.replace(/\/$/, '')
-  const saved = localStorage.getItem(TOKEN_KEY)
+  apiBase.value = (base || '').replace(/\/$/, '')
+  // 会话恢复：优先全局 authStore（导航/登录页同源）
+  await authStore.restore()
+  const saved = authStore.token || localStorage.getItem(TOKEN_KEY)
   if (saved) {
     token.value = saved
     // 尝试拉取 me 校验
@@ -465,14 +464,8 @@ async function prefillFromEntry(userId: number) {
       <section v-if="!loggedUser" class="panel">
         <h3>申请成为贡献者</h3>
         <p class="hint">登录后即可提交申请（GitHub 授权）。</p>
-        <button class="btn primary" @click="beginLogin">使用 GitHub 登录</button>
-        <div v-if="device" class="device">
-          <p>请在 GitHub 设备授权页输入设备码：</p>
-          <div class="code">{{ device.user_code }}</div>
-          <p class="hint">授权地址：{{ device.verification_uri }}（等待自动确认…）</p>
-          <p v-if="deviceExpired" class="error">设备码已过期，请点击上方 GitHub 登录重新获取。</p>
-          <button class="btn mini" @click="cancelDevicePolling">取消等待</button>
-        </div>
+        <a class="btn primary" href="/login?redirect=/posts/base-info/apply">使用 GitHub 登录</a>
+        <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       </section>
 
       <section v-else class="panel">
