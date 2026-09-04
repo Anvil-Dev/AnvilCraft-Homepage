@@ -404,8 +404,7 @@ async function submit() {
 }
 
 onMounted(async () => {
-  const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  apiBase.value = (base || '').replace(/\/$/, '')
+  apiBase.value = ((window as any).__ANVIL_API_BASE__ as string | undefined || 'https://api.anvilcraft.dev').replace(/\/$/, '')
   // 会话恢复：优先全局 authStore（导航/登录页同源）
   await authStore.restore()
   const saved = authStore.token || localStorage.getItem(TOKEN_KEY)

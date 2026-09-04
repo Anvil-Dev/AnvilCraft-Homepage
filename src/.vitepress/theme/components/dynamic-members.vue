@@ -91,8 +91,8 @@ function categoryLine(e: Entry): string {
 async function load() {
   loading.value = true
   error.value = ''
-  const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  apiBase.value = (base || '').replace(/\/$/, '')
+  const base = (window as any).__ANVIL_API_BASE__ as string | undefined || 'https://api.anvilcraft.dev'
+  apiBase.value = base.replace(/\/$/, '')
   try {
     const [catRes, entryRes, checkRes] = await Promise.all([
       fetch(`${apiBase.value}/api/v1/categories`),

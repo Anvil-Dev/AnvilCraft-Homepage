@@ -360,9 +360,7 @@ async function verifyTOTP() {
 }
 
 onMounted(async () => {
-  // API 基址：__ANVIL_API_BASE__ 优先，缺省同源（生产反代 /api）
-  const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  apiBase.value = (base || '').replace(/\/$/, '')
+  apiBase.value = ((window as any).__ANVIL_API_BASE__ as string | undefined || 'https://api.anvilcraft.dev').replace(/\/$/, '')
   enabled.value = true
   errorMsg.value = ''
   // 会话恢复：优先全局 authStore（与导航/登录页同源）

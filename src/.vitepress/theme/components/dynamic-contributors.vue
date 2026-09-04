@@ -71,16 +71,9 @@ function avatarColor(nickname: string): string {
 async function load() {
   loading.value = true
   error.value = ''
-  const base = (window as any).__ANVIL_API_BASE__ as string | undefined
-  if (!base) {
-    loading.value = false
-    enabled.value = false
-    noConfig.value = true
-    error.value = '尚未配置后端 API 地址（window.__ANVIL_API_BASE__）'
-    return
-  }
-  noConfig.value = false
+  const base = (window as any).__ANVIL_API_BASE__ as string | undefined || 'https://api.anvilcraft.dev'
   apiBase.value = base.replace(/\/$/, '')
+  noConfig.value = false
   try {
     const [catRes, entryRes, checkRes] = await Promise.all([
       fetch(`${apiBase.value}/api/v1/categories`),

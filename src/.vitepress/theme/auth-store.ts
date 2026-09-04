@@ -15,9 +15,11 @@ export interface UserInfo {
 
 export const TOKEN_KEY = 'anvil_website_token'
 
+export const DEFAULT_API_BASE = 'https://api.anvilcraft.dev'
+
 function apiBase(): string {
   const b = (window as any).__ANVIL_API_BASE__ as string | undefined
-  return b ? b.replace(/\/$/, '') : ''
+  return (b || DEFAULT_API_BASE).replace(/\/$/, '')
 }
 
 function apiURL(p: string): string {

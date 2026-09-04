@@ -19,8 +19,6 @@ import DynamicMembers from '@theme/components/dynamic-members.vue';
 
 ---
 
-> 以下成员数据由后端动态维护（管理员审核通过后自动上墙）。
-
 <DynamicMembers />
 
 ## 没有找到你？
