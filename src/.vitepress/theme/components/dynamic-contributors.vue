@@ -24,7 +24,7 @@ interface Entry {
   avatar_url: string
   display_id: string
   description: string
-  category_id: number
+  category_ids: number[]
   check_states: Record<string, boolean> | null
   user?: { bio?: string } | null
 }
@@ -155,7 +155,8 @@ onUnmounted(() => {
 // 主列表分类（非单独列出）与独立榜单
 const mainCategories = (): Category[] => categories.value.filter(c => !c.separate)
 const separateCategories = (): Category[] => categories.value.filter(c => c.separate)
-const entriesOf = (catId: number): Entry[] => entries.value.filter(e => e.category_id === catId)
+// 某分类下的条目（一人可属多分类，卡片会出现在其每个分类下）
+const entriesOf = (catId: number): Entry[] => entries.value.filter(e => (e.category_ids ?? []).includes(catId))
 </script>
 
 <template>
