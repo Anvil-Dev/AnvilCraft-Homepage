@@ -49,8 +49,8 @@ async function beginLogin() {
   errorMsg.value = ''
   deviceExpired.value = false
   try {
-    // Device Flow 恒可用（GitHub 设备流仅需 client_id，后端已强制该端点走设备流）
-    const r = await fetch(apiURL('/auth/device/start'))
+    // Device Flow 恒可用（GitHub 设备流仅需 client_id，后端已强制该端点走设备流；POST）
+    const r = await fetch(apiURL('/auth/device/start'), {method: 'POST'})
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const j = await r.json()
     if (j.device_flow) {
