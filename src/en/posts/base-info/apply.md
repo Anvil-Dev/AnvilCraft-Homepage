@@ -1,5 +1,6 @@
 ---
 title: Apply as Contributor
+nav: false
 ---
 
 <script setup>

@@ -39,6 +39,17 @@ function getSidebar(filePath: string) {
     }
 }
 
+// frontmatter 含 `nav: false` 时不在侧边栏/导航展示（页面仍可直链访问）
+function navHidden(filePath: string): boolean {
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8')
+        const {data} = matter(content)
+        return data.nav === false
+    } catch {
+        return false
+    }
+}
+
 /**
  * 递归扫描目录，生成嵌套的sidebar结构
  */
@@ -57,6 +68,8 @@ function scanDirectory(dirPath: string, basePath: string, lang: string = 'zh') {
     // 处理markdown文件
     files.forEach(file => {
         const filePath = path.join(dirPath, file)
+        // 支持 frontmatter `nav: false`：页面保留可访问，但不显示在侧边栏
+        if (navHidden(filePath)) return
         const linkPath = path.join(basePath, file.replace('.md', ''))
 
         items.push({

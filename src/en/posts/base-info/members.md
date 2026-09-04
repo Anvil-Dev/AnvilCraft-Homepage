@@ -5,6 +5,8 @@ title: Special Thanks
 <script setup>
 // @ts-ignore
 import Members from '@theme/components/members.vue';
+// @ts-ignore
+import DynamicMembers from '@theme/components/dynamic-members.vue';
 </script>
 
 # Members
@@ -17,10 +19,10 @@ import Members from '@theme/components/members.vue';
 
 ---
 
-<Members type="contributors" />
+> The data below is maintained dynamically by the backend (auto-published after admin review).
 
-# Supporters
+<DynamicMembers />
 
----
+## Not found yourself?
 
-<Members type="supporters" />
+If you have contributed to AnvilCraft, feel free to [apply here](/posts/base-info/apply) — fill in your project and details, and you will be listed once approved by an admin.

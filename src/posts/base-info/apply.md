@@ -1,5 +1,6 @@
 ---
 title: 申请成为贡献者
+nav: false
 ---
 
 <script setup>

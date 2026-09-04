@@ -5,6 +5,8 @@ title: 特别鸣谢
 <script setup>
 // @ts-ignore
 import Members from '@theme/components/members.vue';
+// @ts-ignore
+import DynamicMembers from '@theme/components/dynamic-members.vue';
 </script>
 
 # 成员
@@ -17,10 +19,10 @@ import Members from '@theme/components/members.vue';
 
 ---
 
-<Members type="contributors" />
+> 以下成员数据由后端动态维护（管理员审核通过后自动上墙）。
 
-# 赞助者
+<DynamicMembers />
 
----
+## 没有找到你？
 
-<Members type="supporters" />
+如果你参与过 AnvilCraft 的开发或创作，欢迎 [点击此处提交申请](/posts/base-info/apply) —— 填写你的贡献项目与信息，管理员审核通过后即可上墙。
