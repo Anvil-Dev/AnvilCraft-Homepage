@@ -8,17 +8,6 @@ import path from 'node:path'
 // @ts-ignore
 import matter from 'gray-matter'
 
-/**
- * 构建期注入后端 API 基址：读取环境变量 ANVIL_API_BASE。
- * 页面组件通过 window.__ANVIL_API_BASE__ 访问；未配置时页面显示提示。
- */
-function apiBaseScript() {
-    // @ts-ignore
-    const base = process.env.ANVIL_API_BASE || ''
-    if (!base) return null
-    return ['script', {type: 'text/javascript'}, `window.__ANVIL_API_BASE__=${JSON.stringify(base)};`] as const
-}
-
 function getFileTitle(filePath: string) {
     try {
         const content = fs.readFileSync(filePath, 'utf-8')
@@ -194,14 +183,42 @@ function getAutoConfig(lang: string = 'zh', homeName = '首页') {
     return {socialLinks, nav, sidebar, editLink, footer}
 }
 
+// 注入后端 API 基址脚本：经 Vite transformIndexHtml（dev/build 均生效）
+// VitePress 的 head 配置在 dev 模式不输出（SPA HTML 壳），故用插件注入。
+function apiInjectPlugin() {
+    // @ts-ignore
+    const base = process.env.ANVIL_API_BASE || ''
+    if (!base) return null
+    return {
+        name: 'anvil-api-base-inject',
+        // @ts-ignore
+        transformIndexHtml(html) {
+            return {
+                html,
+                tags: [
+                    {
+                        tag: 'script',
+                        attrs: {type: 'text/javascript'},
+                        children: `window.__ANVIL_API_BASE__=${JSON.stringify(base)};`,
+                        injectTo: 'head-prepend',
+                    },
+                ],
+            }
+        },
+    } as const
+}
+
 export default defineConfig({
     title: "AnvilCraft",
     description: "以铁砧为核心的原版生存拓展",
     lastUpdated: true,
     head: [
         ['link', {rel: 'icon', href: '/favicon.ico'}],
-        ...(apiBaseScript() ? [apiBaseScript()] : []),
     ],
+    vite: {
+        // @ts-ignore
+        plugins: [apiInjectPlugin()].filter(Boolean),
+    },
     themeConfig: {
         ...getAutoConfig(),
         search: {
