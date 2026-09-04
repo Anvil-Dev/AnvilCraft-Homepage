@@ -2,9 +2,9 @@
 // 特别鸣谢页动态区：从后端拉取贡献者条目并分组渲染。
 // 规则：非 separate 分类的条目合并显示在「贡献者」组；
 //       separate=true 的分类（如 实力富哥💵=赞助者）各自成独立分组。
-// 卡片与历史贡献者墙一致：头像/昵称/ID/检查清单勾选/悬浮个人描述。
+// 卡片按参考图居中展示：发光头像/昵称/贡献项目/检查清单/展示 ID。
 
-import {onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {upUrl} from './img-url'
 
 interface CheckItem {id: number; name: string; enabled: boolean}
@@ -78,9 +78,14 @@ const orphanSeparate = (catId: number) => {
   const normalIds = new Set(normalCats().map(c => c.id))
   return entriesOf(catId).filter(e => !(e.category_ids ?? []).some(id => normalIds.has(id)))
 }
-// 普通条目额外归属的 separate 分类标记（如 代码民工 也赞助）
-const extraSeparates = (e: Entry) => {
-  return separateCats().filter(c => (e.category_ids ?? []).includes(c.id))
+// 卡片副标题：按后端分类顺序拼接该成员全部贡献项目
+const categoryMap = computed(() => new Map(categories.value.map(c => [c.id, c])))
+function categoryLine(e: Entry): string {
+  return (e.category_ids ?? [])
+      .map(id => categoryMap.value.get(id))
+      .filter((c): c is Category => Boolean(c))
+      .map(c => `${c.name} ${c.emoji}`)
+      .join(' ')
 }
 
 async function load() {
@@ -157,26 +162,25 @@ onUnmounted(() => {
               v-for="e in mergedEntries()"
               :key="e.id"
               class="card"
-              :title="descOf(e) || undefined"
           >
-            <img
-                v-if="e.avatar_url || avatarOf(e)"
-                class="avatar"
-                :src="avatarOf(e)"
-                :alt="e.nickname"
-                loading="lazy"
-            />
-            <span
-                v-else
-                class="avatar avatar-fallback"
-                :style="{background: avatarColor(e.nickname)}"
-            >{{ avatarText(e.nickname) }}</span>
+            <div class="avatar-ring">
+              <img
+                  v-if="e.avatar_url || avatarOf(e)"
+                  class="avatar"
+                  :src="avatarOf(e)"
+                  :alt="e.nickname"
+                  loading="lazy"
+              />
+              <span
+                  v-else
+                  class="avatar avatar-fallback"
+                  :style="{background: avatarColor(e.nickname)}"
+              >{{ avatarText(e.nickname) }}</span>
+            </div>
             <div class="info">
               <div class="name">{{ e.nickname }}</div>
-              <div class="sub">{{ e.display_id }}</div>
-              <div v-if="extraSeparates(e).length" class="tags">
-                <span v-for="c in extraSeparates(e)" :key="c.id" class="tag">{{ c.name }} {{ c.emoji }}</span>
-              </div>
+              <div v-if="categoryLine(e)" class="roles">{{ categoryLine(e) }}</div>
+              <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
             </div>
             <ul v-if="checkItems.length" class="checks">
               <li
@@ -189,7 +193,7 @@ onUnmounted(() => {
                 {{ ci.name }}
               </li>
             </ul>
-            <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
+            <div v-if="e.display_id" class="card-footer">@{{ e.display_id }}</div>
           </div>
         </div>
       </section>
@@ -198,12 +202,15 @@ onUnmounted(() => {
       <section v-for="cat in separateCats()" :key="'sep-' + cat.id" class="cat-block">
         <h2>{{ cat.separate_title || cat.name + ' ' + cat.emoji }}</h2>
         <div class="cards">
-          <div v-for="e in orphanSeparate(cat.id)" :key="e.id" class="card" :title="descOf(e) || undefined">
-            <img v-if="e.avatar_url || avatarOf(e)" class="avatar" :src="avatarOf(e)" :alt="e.nickname" loading="lazy"/>
-            <span v-else class="avatar avatar-fallback" :style="{background: avatarColor(e.nickname)}">{{ avatarText(e.nickname) }}</span>
+          <div v-for="e in orphanSeparate(cat.id)" :key="e.id" class="card">
+            <div class="avatar-ring">
+              <img v-if="e.avatar_url || avatarOf(e)" class="avatar" :src="avatarOf(e)" :alt="e.nickname" loading="lazy"/>
+              <span v-else class="avatar avatar-fallback" :style="{background: avatarColor(e.nickname)}">{{ avatarText(e.nickname) }}</span>
+            </div>
             <div class="info">
               <div class="name">{{ e.nickname }}</div>
-              <div class="sub">{{ e.display_id }}</div>
+              <div v-if="categoryLine(e)" class="roles">{{ categoryLine(e) }}</div>
+              <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
             </div>
             <ul v-if="checkItems.length" class="checks">
               <li v-for="ci in checkItems" :key="ci.id" class="check" :class="{done: e.check_states?.[String(ci.id)]}">
@@ -211,7 +218,7 @@ onUnmounted(() => {
                 {{ ci.name }}
               </li>
             </ul>
-            <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
+            <div v-if="e.display_id" class="card-footer">@{{ e.display_id }}</div>
           </div>
           <p v-if="!orphanSeparate(cat.id).length" class="hint">（暂无）</p>
         </div>
@@ -222,119 +229,182 @@ onUnmounted(() => {
 
 <style scoped>
 .hint {
-  color: #888;
+  color: var(--vp-c-text-3);
   padding: 12px 0;
-}
-.empty {
-  padding: 0;
 }
 .retry-btn {
   margin-top: 8px;
   padding: 5px 16px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--vp-c-divider);
   border-radius: 6px;
-  background: #fff;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
   cursor: pointer;
   font-size: 13px;
 }
 .retry-btn:hover {
-  border-color: #1f6feb;
-  color: #1f6feb;
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
 }
 .cat-block {
   margin: 20px 0;
 }
 .cat-block h2 {
+  color: var(--vp-c-text-1);
   font-size: 1.3em;
   margin-bottom: 12px;
 }
 .cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  justify-content: center;
+  gap: 16px;
+  max-width: 784px;
+  margin: 0 auto;
 }
 .card {
   display: flex;
   flex-direction: column;
-  width: 200px;
-  padding: 12px;
-  border: 1px solid rgba(128, 128, 128, 0.25);
-  border-radius: 10px;
-  background: rgba(128, 128, 128, 0.05);
-  cursor: default;
-  position: relative;
-  transition: box-shadow 0.2s;
+  align-items: center;
+  width: min(calc(50% - 8px), 376px);
+  min-height: 280px;
+  padding: 28px 24px 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 18px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .card:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px);
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+}
+.avatar-ring {
+  width: 88px;
+  height: 88px;
+  padding: 3px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #41d1ff, #00a7c7);
+  box-shadow: 0 0 0 3px var(--vp-c-brand-soft), 0 0 22px rgba(65, 209, 255, 0.28);
 }
 .avatar {
-  width: 56px;
-  height: 56px;
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  margin-bottom: 8px;
+  background: var(--vp-c-bg);
 }
 .avatar-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #333;
+  color: rgba(0, 0, 0, 0.72);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 22px;
+}
+.info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .name {
-  font-weight: 600;
+  color: var(--vp-c-text-1);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
 }
-.sub {
-  color: #888;
-  font-size: 12px;
+.roles {
+  margin-top: 8px;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.7;
 }
-.tags {
-  margin-top: 4px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.tag {
-  font-size: 11px;
-  color: #1f6feb;
-  background: #eef4ff;
-  border-radius: 10px;
-  padding: 0 7px;
-  line-height: 18px;
+.desc {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 .checks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   list-style: none;
-  margin: 8px 0 0;
+  margin: 14px 0 0;
   padding: 0;
 }
 .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  background: var(--vp-c-default-soft);
+  color: var(--vp-c-text-3);
   font-size: 12px;
-  color: #999;
+  line-height: 16px;
 }
 .check .box {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 12px;
   height: 12px;
-  border: 1px solid #aaa;
+  border: 1px solid currentColor;
   border-radius: 3px;
-  margin-right: 4px;
-  line-height: 12px;
   font-size: 10px;
-  text-align: center;
+  line-height: 12px;
 }
 .check.done {
-  color: #2e7d32;
+  border-color: transparent;
+  background: var(--vp-c-tip-soft);
+  color: var(--vp-c-tip-1);
 }
 .check.done .box {
-  background: #2e7d32;
-  color: #fff;
-  border-color: #2e7d32;
+  border-color: transparent;
+  background: var(--vp-c-tip-1);
+  color: var(--vp-c-bg);
 }
-.desc {
-  font-size: 12px;
-  color: #666;
-  margin: 6px 0 0;
+.card-footer {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 16px;
+  color: var(--vp-c-text-3);
+  font-size: 13px;
+  line-height: 20px;
+}
+:global(.dark) .card {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--vp-c-bg-elv, var(--vp-c-bg-soft));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+}
+:global(.dark) .card:hover {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48);
+}
+:global(.dark) .avatar-ring {
+  box-shadow: 0 0 0 3px rgba(65, 209, 255, 0.12), 0 0 26px rgba(65, 209, 255, 0.35);
+}
+@media (max-width: 640px) {
+  .cards {
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .card {
+    width: 100%;
+    max-width: 380px;
+    min-height: 0;
+  }
 }
 </style>
