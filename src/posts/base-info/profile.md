@@ -1,5 +1,6 @@
 ---
 title: 个人中心
+nav: false
 ---
 
 <script setup>

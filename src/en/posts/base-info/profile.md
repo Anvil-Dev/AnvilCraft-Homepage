@@ -1,5 +1,6 @@
 ---
 title: Profile
+nav: false
 ---
 
 <script setup>
