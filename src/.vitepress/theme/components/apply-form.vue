@@ -18,7 +18,7 @@ const token = ref('')
 const categories = ref<Category[]>([])
 
 const form = ref({
-  category_id: 0,
+  category_ids: [] as number[],
   nickname: '',
   id: '',
   qq: '',
@@ -40,6 +40,7 @@ const POLL_TIMEOUT_MS = 15 * 60 * 1000
 interface MyApp {
   id: number
   category_id: number
+  category_ids?: number[]
   nickname: string
   display_id: string
   qq: string
@@ -75,6 +76,9 @@ function setAuth(t: string, u: UserInfo) {
   token.value = t
   loggedUser.value = u
   authStore.setAuth(t, u)
+  // 昵称/ID 由账号确定，仅作展示；无绑定条目时也预填账号名
+  form.value.nickname = u.nickname || u.username || ''
+  form.value.id = u.username || ''
   loadMyApps().catch(() => {})
   startMyAppsPolling()
 }
@@ -259,7 +263,7 @@ async function loadMyApps() {
 function editApp(a: MyApp) {
   editingAppId.value = a.id
   form.value = {
-    category_id: a.category_id,
+    category_ids: a.category_ids && a.category_ids.length ? [...a.category_ids] : [a.category_id],
     nickname: a.nickname,
     id: a.display_id,
     qq: a.qq,
@@ -310,12 +314,23 @@ function catName(id: number): string {
 
 function cancelEdit() {
   editingAppId.value = null
-  form.value = {category_id: 0, nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
+  form.value = {category_ids: [], nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
   imageFiles.value = []
   imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
   imagePreviews.value = []
   existingImages.value = []
   errorMsg.value = ''
+}
+
+// 多选贡献项目切换
+function toggleCategory(id: number, on: boolean) {
+  const ids = form.value.category_ids
+  if (on) {
+    if (!ids.includes(id)) ids.push(id)
+  } else {
+    const i = ids.indexOf(id)
+    if (i >= 0) ids.splice(i, 1)
+  }
 }
 
 // ---------- 提交 ----------
@@ -325,12 +340,8 @@ async function submit() {
     errorMsg.value = '请先登录'
     return
   }
-  if (!form.value.category_id) {
-    errorMsg.value = '请选择贡献项目'
-    return
-  }
-  if (!form.value.nickname.trim()) {
-    errorMsg.value = '昵称必填'
+  if (!form.value.category_ids.length) {
+    errorMsg.value = '请至少选择一个贡献项目'
     return
   }
   submitting.value = true
@@ -379,7 +390,7 @@ async function submit() {
     }
     alert(isEdit ? '申请已更新，等待管理员审核' : '申请已提交，等待管理员审核')
     editingAppId.value = null
-    form.value = {category_id: 0, nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
+    form.value = {category_ids: [], nickname: '', id: '', qq: '', bilibili_uid: '', mc_id: '', description: ''}
     imageFiles.value = []
     imagePreviews.value.forEach((p) => URL.revokeObjectURL(p))
     imagePreviews.value = []
@@ -439,12 +450,26 @@ async function prefillFromEntry(userId: number) {
     if (!r.ok) return
     const j = await r.json()
     const list: any[] = j.entries ?? []
+    // 无论有无条目，昵称/ID 都按登录账号展示
+    if (loggedUser.value) {
+      form.value.nickname = loggedUser.value.nickname || loggedUser.value.username || ''
+      form.value.id = loggedUser.value.username || ''
+    }
     if (!list.length) return
     // 取最近更新的条目（按 id desc 由后端排序保证近似）
     const e = list[list.length - 1]
-    form.value.category_id = e.category_id ?? 0
-    form.value.nickname = e.nickname ?? ''
-    form.value.id = e.display_id ?? ''
+    // 分类预填：已有条目所属项目默认勾上（后端提交时自动过滤已属）
+    const owned = e.category_ids ?? []
+    if (owned.length) {
+      form.value.category_ids = owned.filter((id: number) =>
+        categories.value.some((c) => c.id === id),
+      )
+    }
+    // 资料预填（昵称/ID 以登录账号为准，条目资料仅作 QQ 等参考）
+    if (loggedUser.value) {
+      form.value.nickname = loggedUser.value.nickname || loggedUser.value.username || ''
+      form.value.id = loggedUser.value.username || ''
+    }
     form.value.qq = e.qq ?? ''
     form.value.bilibili_uid = e.bilibili_uid ?? ''
     form.value.mc_id = e.mc_id ?? ''
@@ -514,15 +539,28 @@ async function prefillFromEntry(userId: number) {
         <form class="apply-form" @submit.prevent="submit">
           <h4 v-if="editingAppId !== null">修改申请（#{{ editingAppId }}）</h4>
           <p v-else-if="noticeMsg" class="ok">{{ noticeMsg }}</p>
-          <label class="field">
-            贡献项目（必选）
-            <select v-model.number="form.category_id">
-              <option :value="0" disabled>请选择</option>
-              <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }} {{ c.emoji }}</option>
-            </select>
-          </label>
-          <label class="field">昵称（必填）<input v-model="form.nickname" placeholder="你的昵称" required /></label>
-          <label class="field">ID<input v-model="form.id" placeholder="GitHub 用户名等（可选）" /></label>
+          <div class="field">
+            <span>贡献项目（可多选，必选 ≥1；已属项目已勾上，重复会自动忽略）</span>
+            <div class="cat-checks">
+              <label v-for="c in categories" :key="c.id" class="cat-check">
+                <input
+                    type="checkbox"
+                    :value="c.id"
+                    :checked="form.category_ids.includes(c.id)"
+                    @change="toggleCategory(c.id, ($event.target as HTMLInputElement).checked)"
+                />
+                {{ c.name }} {{ c.emoji }}
+              </label>
+            </div>
+          </div>
+          <div class="field readonly">
+            <span>昵称（由登录账号确定）</span>
+            <div class="ro">{{ loggedUser?.nickname || loggedUser?.username }}</div>
+          </div>
+          <div class="field readonly">
+            <span>ID（GitHub 用户名，由登录账号确定）</span>
+            <div class="ro">@{{ loggedUser?.username }}</div>
+          </div>
           <label class="field">QQ<input v-model="form.qq" placeholder="选填" /></label>
           <label class="field">B站UID<input v-model="form.bilibili_uid" placeholder="选填" /></label>
           <label class="field">Minecraft 正版 ID<input v-model="form.mc_id" placeholder="选填" /></label>
@@ -605,6 +643,41 @@ async function prefillFromEntry(userId: number) {
   display: block;
   margin: 10px 0;
   font-size: 14px;
+}
+.cat-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cat-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.15s;
+}
+.cat-check:hover {
+  border-color: #1f6feb;
+}
+.cat-check input {
+  width: auto;
+  margin: 0;
+  accent-color: #1f6feb;
+}
+.field.readonly .ro {
+  margin-top: 4px;
+  padding: 7px 10px;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  background: #f6f8fa;
+  color: #444;
+  font-weight: 600;
 }
 .apply-form input,
 .apply-form select,
