@@ -1,5 +1,6 @@
 ---
 title: Sign In
+pageClass: login-page
 ---
 
 <script setup>

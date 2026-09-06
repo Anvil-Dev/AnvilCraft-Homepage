@@ -174,12 +174,24 @@ onUnmounted(stopPolling)
 
 <style scoped>
 .device-login {
-  max-width: 420px;
-  margin: 0 auto;
+  max-width: 460px;
+  margin: 24px auto 0;
 }
-.logged-in {
+.logged-in,
+.login-box {
+  padding: 30px 28px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 14px;
+  background: var(--vp-c-bg-soft);
   text-align: center;
-  padding: 24px 0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+:global(.dark) .logged-in,
+:global(.dark) .login-box {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+:global(.login-page .vp-doc h1) {
+  text-align: center;
 }
 .ok {
   font-size: 16px;
@@ -187,9 +199,6 @@ onUnmounted(stopPolling)
 }
 :global(.dark) .ok {
   color: #4ade80;
-}
-.login-box {
-  text-align: center;
 }
 .btn {
   display: inline-block;
@@ -231,12 +240,6 @@ onUnmounted(stopPolling)
 }
 :global(.dark) .error {
   color: #ff7b72;
-}
-.device-panel {
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 12px;
-  padding: 24px 20px;
 }
 .device-panel h3 {
   margin: 0 0 6px;

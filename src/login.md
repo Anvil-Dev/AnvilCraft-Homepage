@@ -1,5 +1,6 @@
 ---
 title: 登录
+pageClass: login-page
 ---
 
 <script setup>
