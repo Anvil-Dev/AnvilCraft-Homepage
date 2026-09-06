@@ -2,12 +2,11 @@
 // 特别鸣谢页动态区：从后端拉取贡献者条目并分组渲染。
 // 规则：非 separate 分类的条目合并显示在「贡献者」组；
 //       separate=true 的分类（如 实力富哥💵=赞助者）各自成独立分组。
-// 卡片按参考图居中展示：发光头像/昵称/贡献项目/检查清单/展示 ID。
+// 卡片按参考图居中展示：发光头像/昵称/贡献项目/主页链接。
 
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {upUrl} from './img-url'
 
-interface CheckItem {id: number; name: string; enabled: boolean}
 interface Category {id: number; name: string; emoji: string; separate: boolean; separate_title: string}
 interface Entry {
   id: number
@@ -17,7 +16,6 @@ interface Entry {
   bilibili_uid: string
   description: string
   category_ids: number[]
-  check_states: Record<string, boolean> | null
   user?: {bio?: string} | null
 }
 
@@ -27,7 +25,6 @@ const error = ref('')
 const noConfig = ref(false)
 const categories = ref<Category[]>([])
 const entries = ref<Entry[]>([])
-const checkItems = ref<CheckItem[]>([])
 
 function descOf(e: Entry): string {
   return e.description || e.user?.bio || ''
@@ -103,18 +100,15 @@ async function load() {
   const base = (window as any).__ANVIL_API_BASE__ as string | undefined || 'https://api.anvilcraft.dev'
   apiBase.value = base.replace(/\/$/, '')
   try {
-    const [catRes, entryRes, checkRes] = await Promise.all([
+    const [catRes, entryRes] = await Promise.all([
       fetch(`${apiBase.value}/api/v1/categories`),
       fetch(`${apiBase.value}/api/v1/contributors`),
-      fetch(`${apiBase.value}/api/v1/checklist`),
     ])
-    if (!catRes.ok || !entryRes.ok || !checkRes.ok) throw new Error('接口请求失败')
+    if (!catRes.ok || !entryRes.ok) throw new Error('接口请求失败')
     const catJson = await catRes.json()
     const entryJson = await entryRes.json()
-    const checkJson = await checkRes.json()
     categories.value = catJson.categories ?? []
     entries.value = entryJson.entries ?? []
-    checkItems.value = (checkJson.items ?? []).filter((i: CheckItem) => i.enabled)
     noConfig.value = false
     error.value = ''
   } catch (e: any) {
@@ -191,17 +185,6 @@ onUnmounted(() => {
               <div v-if="categoryLine(e)" class="roles">{{ categoryLine(e) }}</div>
               <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
             </div>
-            <ul v-if="checkItems.length" class="checks">
-              <li
-                  v-for="ci in checkItems"
-                  :key="ci.id"
-                  class="check"
-                  :class="{done: e.check_states?.[String(ci.id)]}"
-              >
-                <span class="box">{{ e.check_states?.[String(ci.id)] ? '✔' : '' }}</span>
-                {{ ci.name }}
-              </li>
-            </ul>
             <div v-if="e.display_id || e.bilibili_uid" class="card-footer">
               <a
                   v-if="e.display_id"
@@ -248,12 +231,6 @@ onUnmounted(() => {
               <div v-if="categoryLine(e)" class="roles">{{ categoryLine(e) }}</div>
               <p v-if="descOf(e)" class="desc">{{ descOf(e) }}</p>
             </div>
-            <ul v-if="checkItems.length" class="checks">
-              <li v-for="ci in checkItems" :key="ci.id" class="check" :class="{done: e.check_states?.[String(ci.id)]}">
-                <span class="box">{{ e.check_states?.[String(ci.id)] ? '✔' : '' }}</span>
-                {{ ci.name }}
-              </li>
-            </ul>
             <div v-if="e.display_id || e.bilibili_uid" class="card-footer">
               <a
                   v-if="e.display_id"
@@ -396,48 +373,6 @@ onUnmounted(() => {
   line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-}
-.checks {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  list-style: none;
-  margin: 14px 0 0;
-  padding: 0;
-}
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
-  background: var(--vp-c-default-soft);
-  color: var(--vp-c-text-3);
-  font-size: 12px;
-  line-height: 16px;
-}
-.check .box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  font-size: 10px;
-  line-height: 12px;
-}
-.check.done {
-  border-color: transparent;
-  background: var(--vp-c-tip-soft);
-  color: var(--vp-c-tip-1);
-}
-.check.done .box {
-  border-color: transparent;
-  background: var(--vp-c-tip-1);
-  color: var(--vp-c-bg);
 }
 .card-footer {
   display: flex;
