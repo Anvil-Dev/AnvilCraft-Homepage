@@ -13,11 +13,42 @@ let reconnectTimer: number | undefined
 let reconnectDelay = 2000
 const maxReconnectDelay = 30000
 
+// 应用层心跳：每 60s 发一次 ping；连续 5 次未收到 pong 判定假死并主动重连
+const PING_INTERVAL = 60_000
+const MAX_MISSED_PONGS = 5
+let pingTimer: number | undefined
+let missedPongs = 0
+
 function buildURL(base: string): string {
   return `${base.replace(/\/$/, '').replace(/^http/, 'ws')}/api/v1/ws`
 }
 
+function stopPing() {
+  if (pingTimer !== undefined) {
+    clearInterval(pingTimer)
+    pingTimer = undefined
+  }
+  missedPongs = 0
+}
+
+function startPing() {
+  stopPing()
+  pingTimer = window.setInterval(() => {
+    if (!conn || conn.readyState !== WebSocket.OPEN) return
+    if (missedPongs >= MAX_MISSED_PONGS) {
+      // 连续 5 次 ping 未收到 pong：连接假死，断开并立即重连
+      closeConn()
+      reconnectDelay = 2000
+      connect()
+      return
+    }
+    missedPongs++
+    conn.send(JSON.stringify({ type: 'ping' }))
+  }, PING_INTERVAL)
+}
+
 function closeConn() {
+  stopPing()
   if (reconnectTimer !== undefined) {
     clearTimeout(reconnectTimer)
     reconnectTimer = undefined
@@ -47,10 +78,15 @@ function connect() {
   ws.onopen = () => {
     reconnectDelay = 2000
     ws.send(JSON.stringify({ type: 'subscribe', events: EVENTS }))
+    startPing()
   }
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data as string)
+      if (msg.type === 'pong') {
+        missedPongs = 0
+        return
+      }
       if (msg.type !== 'event') return
       for (const cb of listeners) {
         try {
