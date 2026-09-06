@@ -693,6 +693,12 @@ async function prefillFromEntry(userId: number) {
   box-sizing: border-box;
   font-size: 14px;
 }
+.apply-form .cat-check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
 .imgs {
   display: flex;
   flex-wrap: wrap;
