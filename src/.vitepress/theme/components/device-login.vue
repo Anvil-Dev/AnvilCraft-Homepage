@@ -190,6 +190,12 @@ onUnmounted(stopPolling)
 :global(.dark) .login-box {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
+:global(.login-page .VPDoc.has-aside .aside) {
+  display: none;
+}
+:global(.login-page .VPDoc.has-aside .content-container) {
+  max-width: 520px;
+}
 :global(.login-page .vp-doc h1) {
   text-align: center;
 }
