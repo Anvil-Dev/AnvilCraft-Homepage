@@ -55,6 +55,12 @@ onMounted(async () => {
 .link {
   color: var(--vp-c-brand-1);
 }
+:global(.oauth-callback-page .VPDoc.has-aside .aside) {
+  display: none;
+}
+:global(.oauth-callback-page .VPDoc.has-aside .content-container) {
+  max-width: 520px;
+}
 :global(.dark) .error {
   color: #ff7b72;
 }

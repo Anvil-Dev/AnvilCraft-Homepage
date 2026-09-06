@@ -1,6 +1,7 @@
 ---
 title: 登录中
 nav: false
+pageClass: oauth-callback-page
 ---
 
 <script setup>
