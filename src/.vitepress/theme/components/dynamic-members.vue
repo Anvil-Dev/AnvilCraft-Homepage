@@ -6,6 +6,7 @@
 
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {upUrl} from './img-url'
+import {onContributorChange} from '../ws'
 
 interface Category {id: number; name: string; emoji: string; separate: boolean; separate_title: string}
 interface Entry {
@@ -134,8 +135,21 @@ async function refreshSilently() {
 }
 
 let pollTimer: number | null = null
+let offWs: (() => void) | null = null
+let wsReloadTimer: number | undefined
+// WS 事件到达后防抖刷新（合并连续的创建/更新事件）
+function scheduleWsRefresh() {
+  if (wsReloadTimer !== undefined) clearTimeout(wsReloadTimer)
+  wsReloadTimer = window.setTimeout(() => {
+    wsReloadTimer = undefined
+    refreshSilently()
+  }, 500)
+}
 onMounted(() => {
-  load()
+  load().then(() => {
+    // 匿名订阅 WS 实时刷新；连接失败时由 60s 轮询兜底
+    if (apiBase.value) offWs = onContributorChange(apiBase.value, scheduleWsRefresh)
+  })
   pollTimer = window.setInterval(refreshSilently, 60 * 1000)
   document.addEventListener('visibilitychange', onVisibility)
 })
@@ -144,6 +158,8 @@ function onVisibility() {
 }
 onUnmounted(() => {
   if (pollTimer) window.clearInterval(pollTimer)
+  if (wsReloadTimer !== undefined) clearTimeout(wsReloadTimer)
+  offWs?.()
   document.removeEventListener('visibilitychange', onVisibility)
 })
 </script>
