@@ -646,20 +646,23 @@ async function prefillFromEntry(userId: number) {
 }
 .cat-checks {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-top: 6px;
 }
 .cat-check {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
   border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  box-sizing: border-box;
   transition: all 0.15s;
 }
 .cat-check:hover {

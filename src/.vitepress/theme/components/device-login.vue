@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-// 独立登录页核心：GitHub Device Flow 登录。
+// 独立登录页核心：GitHub OAuth 优先，未配置 Secret 时使用 Device Flow。
 // 登录成功后写入全局 authStore，并回跳 ?redirect= 指定路径（默认个人中心）。
 // 若已登录则直接展示「已登录」状态与跳转按钮。
 
@@ -33,6 +33,15 @@ async function beginLogin() {
   deviceExpired.value = false
   starting.value = true
   try {
+    const modeResp = await fetch(apiURL('/auth/mode')).catch(() => null)
+    if (modeResp?.ok) {
+      const mode = await modeResp.json()
+      if (mode.mode === 'oauth') {
+        sessionStorage.setItem('anvil_home_login_redirect', redirectTo.value || currentRedirect())
+        window.location.href = apiURL('/auth/begin?site=website')
+        return
+      }
+    }
     const r = await fetch(apiURL('/auth/device/start'), {method: 'POST'})
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const j = await r.json()
@@ -176,6 +185,9 @@ onUnmounted(stopPolling)
   font-size: 16px;
   color: #2f855a;
 }
+:global(.dark) .ok {
+  color: #4ade80;
+}
 .login-box {
   text-align: center;
 }
@@ -208,7 +220,7 @@ onUnmounted(stopPolling)
   background: transparent;
 }
 .hint {
-  color: #6b7280;
+  color: var(--vp-c-text-2);
   font-size: 13px;
   margin-top: 14px;
 }
@@ -217,38 +229,42 @@ onUnmounted(stopPolling)
   font-size: 13px;
   margin-top: 10px;
 }
+:global(.dark) .error {
+  color: #ff7b72;
+}
 .device-panel {
-  background: #fafbfc;
-  border: 1px solid #e5e7eb;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   padding: 24px 20px;
 }
 .device-panel h3 {
   margin: 0 0 6px;
+  color: var(--vp-c-text-1);
 }
 .tip {
-  color: #6b7280;
+  color: var(--vp-c-text-2);
   font-size: 14px;
 }
 .code {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 4px;
-  color: #1f6feb;
+  color: var(--vp-c-brand-1);
   padding: 8px 14px;
   border-radius: 8px;
-  background: #eef4ff;
+  background: var(--vp-c-brand-soft);
   display: inline-block;
   margin: 12px 0;
   cursor: pointer;
   user-select: all;
 }
 .or {
-  color: #9ca3af;
+  color: var(--vp-c-text-3);
   font-size: 12px;
   margin: 10px 0 4px;
 }
 .or a {
-  color: #1f6feb;
+  color: var(--vp-c-brand-1);
 }
 </style>
